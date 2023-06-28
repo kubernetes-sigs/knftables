@@ -83,7 +83,7 @@ func TestListBad(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var nftErr error
 			if tc.nftError != "" {
-				nftErr = fmt.Errorf("dummy")
+				nftErr = fmt.Errorf(tc.nftError)
 			}
 
 			fexec := newFakeExec(t)
@@ -91,7 +91,6 @@ func TestListBad(t *testing.T) {
 				expectedCmd{
 					args:   []string{"nft", "-j", "list", "chains", "ip"},
 					stdout: tc.nftOutput,
-					stderr: tc.nftError,
 					err:    nftErr,
 				},
 			)

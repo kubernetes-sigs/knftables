@@ -21,40 +21,65 @@ import (
 	"io"
 	"os/exec"
 	"reflect"
-	"strings"
 	"testing"
 )
 
 // execer is a mockable wrapper around os/exec.
 type execer interface {
-	// Run wraps exec.Cmd.Run
-	Run(cmd *exec.Cmd) error
+	// LookPath wraps exec.LookPath
+	LookPath(file string) (string, error)
 
-	// CombinedOutput wraps exec.Cmd.CombinedOutput
-	CombinedOutput(cmd *exec.Cmd) ([]byte, error)
+	// Run runs cmd as with cmd.Output(). If an error occurs, and the process outputs
+	// stderr, then that output will be returned in the error.
+	Run(cmd *exec.Cmd) (string, error)
 }
 
 // realExec implements execer by actually using os/exec
 type realExec struct {}
 
-func (_ realExec) Run(cmd *exec.Cmd) error {
-	return cmd.Run()
+// LookPath is part of execer
+func (_ realExec) LookPath(file string) (string, error) {
+	return exec.LookPath(file)
 }
 
-func (_ realExec) CombinedOutput(cmd *exec.Cmd) ([]byte, error) {
-	return cmd.CombinedOutput()
+// Run is part of execer
+func (_ realExec) Run(cmd *exec.Cmd) (string, error) {
+	outBytes, err := cmd.Output()
+	out := string(outBytes)
+	if err == nil {
+		return out, nil
+	}
+	if ee, ok := err.(*exec.ExitError); ok {
+		if len(ee.Stderr) > 0 {
+			return out, fmt.Errorf("%s", string(ee.Stderr))
+		}
+	}
+	return out, err
 }
 
 // fakeExec is a mockable implementation of execer for unit tests
 type fakeExec struct {
 	t *testing.T 
 
+	// missingBinaries is the set of binaries for which LookPath should fail
+	missingBinaries map[string]bool
+
+	// expected is the list of expected Run calls
 	expected []expectedCmd
-	matched  int
+
+	// matched is used internally, to keep track of where we are in expected
+	matched int
 }
 
 func newFakeExec(t *testing.T) *fakeExec {
-	return &fakeExec{t: t}
+	return &fakeExec{t: t, missingBinaries: make(map[string]bool)}
+}
+
+func (fe *fakeExec) LookPath(file string) (string, error) {
+	if fe.missingBinaries[file] {
+		return "", &exec.Error{file, exec.ErrNotFound}
+	}
+	return "/" + file, nil
 }
 
 // expectedCmd details one expected fakeExec Cmd
@@ -62,25 +87,24 @@ type expectedCmd struct {
 	args   []string
 	stdin  string
 	stdout string
-	stderr string
 	err    error
 }
 
-func (fe *fakeExec) check(cmd *exec.Cmd) (*expectedCmd, error) {
+func (fe *fakeExec) Run(cmd *exec.Cmd) (string, error) {
 	if fe.t.Failed() {
-		return nil, fmt.Errorf("unit test failed")
+		return "", fmt.Errorf("unit test failed")
 	}
 
 	if len(fe.expected) == fe.matched {
-		fe.t.Errorf("ran out of commands before executing %s %s", cmd.Path, strings.Join(cmd.Args, " "))
-		return nil, fmt.Errorf("unit test failed")
+		fe.t.Errorf("ran out of commands before executing %v", cmd.Args)
+		return "", fmt.Errorf("unit test failed")
 	}
 	expected := &fe.expected[fe.matched]
 	fe.matched++
 
 	if !reflect.DeepEqual(expected.args, cmd.Args) {
 		fe.t.Errorf("incorrect arguments: expected %v, got %v", expected.args, cmd.Args)
-		return nil, fmt.Errorf("unit test failed")
+		return "", fmt.Errorf("unit test failed")
 	}
 
 	var stdin string
@@ -90,32 +114,8 @@ func (fe *fakeExec) check(cmd *exec.Cmd) (*expectedCmd, error) {
 	}
 	if expected.stdin != stdin {
 		fe.t.Errorf("incorrect stdin: expected %q, got %q", expected.stdin, stdin)
-		return nil, fmt.Errorf("unit test failed")
+		return "", fmt.Errorf("unit test failed")
 	}
 
-	return expected, nil
-}
-
-func (fe *fakeExec) Run(cmd *exec.Cmd) error {
-	expected, err := fe.check(cmd)
-	if err != nil {
-		return err
-	}
-
-	if cmd.Stdout != nil {
-		_, _ = cmd.Stdout.Write([]byte(expected.stdout))
-	}
-	if cmd.Stderr != nil {
-		_, _ = cmd.Stderr.Write([]byte(expected.stderr))
-	}
-	return expected.err
-}
-
-func (fe *fakeExec) CombinedOutput(cmd *exec.Cmd) ([]byte, error) {
-	expected, err := fe.check(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	return []byte(expected.stdout+expected.stderr), expected.err
+	return expected.stdout, expected.err
 }

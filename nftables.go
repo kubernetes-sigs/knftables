@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 )
 
 // Interface is an interface for running nftables commands against a given family and table.
@@ -50,8 +49,12 @@ func New() Interface {
 
 // Present is part of Interface.
 func (runner *runner) Present() error {
+	if _, err := runner.exec.LookPath("nft"); err != nil {
+		return fmt.Errorf("could not run nftables binary: %v", err)
+	}
+
 	cmd := exec.Command("nft", "--check", "add", "table", "testing")
-	_, err := runner.exec.CombinedOutput(cmd)
+	_, err := runner.exec.Run(cmd)
 	return err
 }
 
@@ -68,12 +71,8 @@ func (runner *runner) Run(ctx context.Context, tx *Transaction) error {
 
 	cmd := exec.CommandContext(ctx, "nft", "-f", "-")
 	cmd.Stdin = buf
-	out, err := runner.exec.CombinedOutput(cmd)
-
-	if err != nil {
-		return fmt.Errorf("failed to run nft: %s", string(out))
-	}
-	return nil
+	_, err = runner.exec.Run(cmd)
+	return err
 }
 
 func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
@@ -100,17 +99,12 @@ func (runner *runner) List(ctx context.Context, family Family, tableName, object
 	}
 
 	cmd := exec.CommandContext(ctx, "nft", "-j", "list", typePlural, string(family))
-	stdout := &strings.Builder{}
-	cmd.Stdout = stdout
-	stderr := &strings.Builder{}
-	cmd.Stderr = stderr
-
-	err := runner.exec.Run(cmd)
+	out, err := runner.exec.Run(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run nft: %s", stderr.String())
+		return nil, fmt.Errorf("failed to run nft: %v", err)
 	}
 
-	// stdout contains JSON looking like:
+	// out contains JSON looking like:
 	// {
 	//   "nftables": [
 	//     {
@@ -133,20 +127,20 @@ func (runner *runner) List(ctx context.Context, family Family, tableName, object
 	// }
 
 	jsonResult := map[string][]map[string]map[string]interface{}{}
-	if err := json.Unmarshal([]byte(stdout.String()), &jsonResult); err != nil {
+	if err := json.Unmarshal([]byte(out), &jsonResult); err != nil {
 		return nil, fmt.Errorf("could not parse nft output: %v", err)
 	}
 
 	nftablesResult := jsonResult["nftables"]
 	if nftablesResult == nil || len(nftablesResult) == 0 {
-		return nil, fmt.Errorf("could not find result in nft output %q", stdout.String())
+		return nil, fmt.Errorf("could not find result in nft output %q", out)
 	}
 	metainfo := nftablesResult[0]["metainfo"]
 	if metainfo == nil {
-		return nil, fmt.Errorf("could not find metadata in nft output %q", stdout.String())
+		return nil, fmt.Errorf("could not find metadata in nft output %q", out)
 	}
 	if version, ok := jsonVal[float64](metainfo, "json_schema_version"); !ok || version != 1.0 {
-		return nil, fmt.Errorf("could not find supported json_schema_version in nft output %q", stdout.String())
+		return nil, fmt.Errorf("could not find supported json_schema_version in nft output %q", out)
 	}
 
 	var result []string
