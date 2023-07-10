@@ -36,30 +36,30 @@ type Interface interface {
 	Run(ctx context.Context, tx *Transaction) error
 }
 
-// runner is an implementation of Interface
-type runner struct {
+// realNFTables is an implementation of Interface
+type realNFTables struct {
 	exec execer
 }
 
 func New() Interface {
-	return &runner{
+	return &realNFTables{
 		exec: realExec{},
 	}
 }
 
 // Present is part of Interface.
-func (runner *runner) Present() error {
-	if _, err := runner.exec.LookPath("nft"); err != nil {
+func (nft *realNFTables) Present() error {
+	if _, err := nft.exec.LookPath("nft"); err != nil {
 		return fmt.Errorf("could not run nftables binary: %v", err)
 	}
 
 	cmd := exec.Command("nft", "--check", "add", "table", "testing")
-	_, err := runner.exec.Run(cmd)
+	_, err := nft.exec.Run(cmd)
 	return err
 }
 
 // Run is part of Interface
-func (runner *runner) Run(ctx context.Context, tx *Transaction) error {
+func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 	if tx.err != nil {
 		return tx.err
 	}
@@ -71,7 +71,7 @@ func (runner *runner) Run(ctx context.Context, tx *Transaction) error {
 
 	cmd := exec.CommandContext(ctx, "nft", "-f", "-")
 	cmd.Stdin = buf
-	_, err = runner.exec.Run(cmd)
+	_, err = nft.exec.Run(cmd)
 	return err
 }
 
@@ -86,7 +86,7 @@ func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 }
 
 // List is part of Interface.
-func (runner *runner) List(ctx context.Context, family Family, tableName, objectType string) ([]string, error) {
+func (nft *realNFTables) List(ctx context.Context, family Family, tableName, objectType string) ([]string, error) {
 	// All currently-existing nftables object types have plural forms that are just
 	// the singular form plus 's'.
 	var typeSingular, typePlural string
@@ -99,7 +99,7 @@ func (runner *runner) List(ctx context.Context, family Family, tableName, object
 	}
 
 	cmd := exec.CommandContext(ctx, "nft", "-j", "list", typePlural, string(family))
-	out, err := runner.exec.Run(cmd)
+	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %v", err)
 	}

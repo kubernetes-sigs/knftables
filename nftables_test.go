@@ -94,7 +94,7 @@ func TestListBad(t *testing.T) {
 					err:    nftErr,
 				},
 			)
-			nft := &runner{fexec}
+			nft := &realNFTables{fexec}
 
 			result, err := nft.List(context.Background(), IPv4Family, "testing", "chains")
 			if result != nil {
@@ -141,7 +141,7 @@ func TestList(t *testing.T) {
 					stdout: tc.nftOutput,
 				},
 			)
-			nft := &runner{fexec}
+			nft := &realNFTables{fexec}
 
 			result, err := nft.List(context.Background(), IPv4Family, "testing", tc.objType)
 			if err != nil {
@@ -156,7 +156,7 @@ func TestList(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	fexec := newFakeExec(t)
-	nft := &runner{fexec}
+	nft := &realNFTables{fexec}
 
 	tx := NewTransaction(IPv4Family, "kube-proxy")
 	tx.Define("IP", "ip")
