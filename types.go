@@ -24,29 +24,12 @@ import (
 // Object is the interface for an nftables object. All of the concrete object types
 // implement this interface.
 type Object interface {
-	// GetType returns the type of the object (eg, "chain", "map")
-	GetType() string
-
-	// GetName returns the name of the object
-	GetName() string
-
-	// GetFamily returns the object's nftables family
-	GetFamily() Family
-
-	// GetTable returns the name of the object's table
-	GetTable() string
-
-	// GetHandle returns the object's handle (or an error if the handle is unknown
-	// of this object type does not have handles)
-	GetHandle() (int, error)
-
-	// validate validates an object for an operation, possibly filling in default
-	// values.
-	validate(verb verb, defaultFamily Family, defaultTable string) error
+	// validate validates an object for an operation
+	validate(verb verb) error
 
 	// writeOperation writes out an "nft" operation involving the object. It assumes
 	// that the object has been validated.
-	writeOperation(verb verb, writer io.Writer)
+	writeOperation(verb verb, family Family, table string, writer io.Writer)
 }
 
 // Family is an nftables family
@@ -74,24 +57,8 @@ const (
 	NetDevFamily Family = "netdev"
 )
 
-// TableName represents the family and table name associated with an nftables object. This
-// is normally omitted when constructing objects because it will be filled in
-// automatically when the object is used in a Transaction.
-type TableName struct {
-	// Family is the nftables family of the table.
-	Family Family
-
-	// Name is the name of the table.
-	Name string
-}
-
 // Table represents an nftables table.
 type Table struct {
-	// Name contains the name of the table; This is normally omitted when constructing
-	// a Table because it will be filled in automatically when the table is used in a
-	// Transaction.
-	Name *TableName
-
 	// Comment is an optional comment for the table. (Note that this can be specified
 	// on creation, but depending on the version of /sbin/nft that is available, it
 	// may not be filled in correctly in the result of a List.)
@@ -178,11 +145,6 @@ const (
 // Chain represents an nftables chain; either a "base chain" (if Type, Hook, and Priority
 // are specified), or a "regular chain" (if they are not).
 type Chain struct {
-	// Table contains the name of the table; This is normally omitted when
-	// constructing a Chain because it will be filled in automatically when the chain
-	// is used in a Transaction.
-	Table *TableName
-
 	// Name is the name of the chain.
 	Name string
 
@@ -206,11 +168,6 @@ type Chain struct {
 
 // Rule represents a rule in a chain
 type Rule struct {
-	// Table contains the name of the table containing this rule; This is normally
-	// omitted when constructing a Rule because it will be filled in automatically
-	// when the rule is used in a Transaction.
-	Table *TableName
-
 	// Chain is the name of the chain that contains this rule
 	Chain string
 
@@ -269,11 +226,6 @@ const (
 
 // Set represents the definition of an nftables set (but not its elements)
 type Set struct {
-	// Table contains the name of the table; This is normally omitted when
-	// constructing a Set because it will be filled in automatically when the chain
-	// is used in a Transaction.
-	Table *TableName
-
 	// Name is the name of the set.
 	Name string
 
@@ -317,11 +269,6 @@ type Set struct {
 
 // Map represents the definition of an nftables map (but not its elements)
 type Map struct {
-	// Table contains the name of the table; This is normally omitted when
-	// constructing a Map because it will be filled in automatically when the chain
-	// is used in a Transaction.
-	Table *TableName
-
 	// Name is the name of the map.
 	Name string
 
@@ -361,11 +308,6 @@ type Map struct {
 
 // Element represents a set or map element
 type Element struct {
-	// Table contains the name of the table; This is normally omitted when
-	// constructing an Element because it will be filled in automatically when the
-	// chain is used in a Transaction.
-	Table *TableName
-
 	// Name is the name of the element's set or map.
 	Name string
 

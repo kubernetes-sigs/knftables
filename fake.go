@@ -118,27 +118,27 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 	// FIXME: not actually transactional!
 
 	for _, op := range tx.operations {
-		family := op.obj.GetFamily()
-		tableName := op.obj.GetTable()
-		tables := fake.Tables[family]
+		tables := fake.Tables[tx.family]
 		if tables == nil {
-			fake.Tables[family] = make(map[string]*FakeTable)
+			fake.Tables[tx.family] = make(map[string]*FakeTable)
 		}
-		existingTable := fake.Tables[family][tableName]
-		if existingTable == nil && op.verb != addVerb && op.obj.GetType() != "table" {
-			return fmt.Errorf("no such table \"%s %s\"", family, tableName)
+		existingTable := fake.Tables[tx.family][tx.table]
+		if existingTable == nil {
+			if _, ok := op.obj.(*Table); !ok || op.verb != addVerb {
+				return fmt.Errorf("no such table \"%s %s\"", tx.family, tx.table)
+			}
 		}
 
 		switch obj := op.obj.(type) {
 		case *Table:
 			switch op.verb {
 			case flushVerb:
-				delete(fake.Tables[family], tableName)
+				delete(fake.Tables[tx.family], tx.table)
 				existingTable = nil
 				fallthrough
 			case addVerb:
 				if existingTable == nil {
-					fake.Tables[family][tableName] = &FakeTable{
+					fake.Tables[tx.family][tx.table] = &FakeTable{
 						Table:  *obj,
 						Chains: make(map[string]*FakeChain),
 						Sets:   make(map[string]*FakeSet),
@@ -146,7 +146,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					}
 				}
 			case deleteVerb:
-				delete(fake.Tables[family], tableName)
+				delete(fake.Tables[tx.family], tx.table)
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
@@ -288,31 +288,31 @@ func (fake *Fake) Dump() string {
 		tables := fake.Tables[Family(family)]
 		for _, tname := range sortKeys(tables) {
 			table := tables[tname]
-			table.writeOperation(addVerb, buf)
+			table.writeOperation(addVerb, family, tname, buf)
 
 			for _, cname := range sortKeys(table.Chains) {
 				ch := table.Chains[cname]
-				ch.writeOperation(addVerb, buf)
+				ch.writeOperation(addVerb, family, tname, buf)
 
 				for _, rule := range ch.Rules {
-					rule.writeOperation(addVerb, buf)
+					rule.writeOperation(addVerb, family, tname, buf)
 				}
 			}
 
 			for _, sname := range sortKeys(table.Sets) {
 				s := table.Sets[sname]
-				s.writeOperation(addVerb, buf)
+				s.writeOperation(addVerb, family, tname, buf)
 
 				for _, element := range s.Elements {
-					element.writeOperation(addVerb, buf)
+					element.writeOperation(addVerb, family, tname, buf)
 				}
 			}
 			for _, mname := range sortKeys(table.Maps) {
 				m := table.Maps[mname]
-				m.writeOperation(addVerb, buf)
+				m.writeOperation(addVerb, family, tname, buf)
 
 				for _, element := range m.Elements {
-					element.writeOperation(addVerb, buf)
+					element.writeOperation(addVerb, family, tname, buf)
 				}
 			}
 		}
@@ -321,11 +321,11 @@ func (fake *Fake) Dump() string {
 	return buf.String()
 }
 
-func sortKeys[K ~string, V any](m map[K]V) []string {
-	keys := make([]string, 0, len(m))
+func sortKeys[K ~string, V any](m map[K]V) []K {
+	keys := make([]K, 0, len(m))
 	for key := range m {
-		keys = append(keys, string(key))
+		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	return keys
 }

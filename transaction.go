@@ -85,7 +85,7 @@ func (tx *Transaction) asCommandBuf() (io.Reader, error) {
 		}
 	}
 	for _, op := range tx.operations {
-		op.obj.writeOperation(op.verb, buf)
+		op.obj.writeOperation(op.verb, tx.family, tx.table, buf)
 	}
 	return buf, nil
 }
@@ -98,7 +98,7 @@ func (tx *Transaction) Add(obj Object) {
 	if tx.err != nil {
 		return
 	}
-	if tx.err = obj.validate(addVerb, tx.family, tx.table); tx.err != nil {
+	if tx.err = obj.validate(addVerb); tx.err != nil {
 		return
 	}
 
@@ -112,7 +112,7 @@ func (tx *Transaction) Flush(obj Object) {
 	if tx.err != nil {
 		return
 	}
-	if tx.err = obj.validate(flushVerb, tx.family, tx.table); tx.err != nil {
+	if tx.err = obj.validate(flushVerb); tx.err != nil {
 		return
 	}
 
@@ -127,7 +127,7 @@ func (tx *Transaction) Delete(obj Object) {
 	if tx.err != nil {
 		return
 	}
-	if tx.err = obj.validate(deleteVerb, tx.family, tx.table); tx.err != nil {
+	if tx.err = obj.validate(deleteVerb); tx.err != nil {
 		return
 	}
 

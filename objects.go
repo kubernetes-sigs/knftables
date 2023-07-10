@@ -22,43 +22,7 @@ import (
 )
 
 // Object implementation for Table
-func (table *Table) GetType() string {
-	return "table"
-}
-
-func (table *Table) GetName() string {
-	if table.Name == nil {
-		return ""
-	}
-	return table.Name.Name
-}
-
-func (table *Table) GetFamily() Family {
-	if table.Name == nil {
-		return ""
-	}
-	return table.Name.Family
-}
-
-func (table *Table) GetTable() string {
-	if table.Name == nil {
-		return ""
-	}
-	return table.Name.Name
-}
-
-func (table *Table) GetHandle() (int, error) {
-	if table.Handle == nil {
-		return -1, fmt.Errorf("handle not set")
-	}
-	return *table.Handle, nil
-}
-
-func (table *Table) validate(verb verb, defaultFamily Family, defaultTable string) error {
-	if table.Name == nil {
-		table.Name = &TableName{Family: defaultFamily, Name: defaultTable}
-	}
-
+func (table *Table) validate(verb verb) error {
 	switch verb {
 	case addVerb, flushVerb:
 		if table.Handle != nil {
@@ -73,70 +37,31 @@ func (table *Table) validate(verb verb, defaultFamily Family, defaultTable strin
 	return nil
 }
 
-func (table *Table) writeOperation(verb verb, writer io.Writer) {
+func (table *Table) writeOperation(verb verb, family Family, tableName string, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && table.Handle != nil {
-		fmt.Fprintf(writer, "delete table %s handle %d", table.Name.Family, *table.Handle)
+		fmt.Fprintf(writer, "delete table %s handle %d", family, *table.Handle)
 		return
 	}
 
 	// All other cases refer to the table by name
-	fmt.Fprintf(writer, "%s table %s %s", verb, table.Name.Family, table.Name.Name)
-	if table.Comment != nil {
+	fmt.Fprintf(writer, "%s table %s %s", verb, family, tableName)
+	if verb == addVerb && table.Comment != nil {
 		fmt.Fprintf(writer, " { comment %q ; }", *table.Comment)
 	}
 	fmt.Fprintf(writer, "\n")
 }
 
 // Object implementation for Chain
-func (chain *Chain) GetType() string {
-	return "chain"
-}
-
-func (chain *Chain) GetName() string {
-	return chain.Name
-}
-
-func (chain *Chain) GetFamily() Family {
-	if chain.Table == nil {
-		return ""
-	}
-	return chain.Table.Family
-}
-
-func (chain *Chain) GetTable() string {
-	if chain.Table == nil {
-		return ""
-	}
-	return chain.Table.Name
-}
-
-func (chain *Chain) GetHandle() (int, error) {
-	if chain.Handle == nil {
-		return -1, fmt.Errorf("handle not set")
-	}
-	return *chain.Handle, nil
-}
-
-func (chain *Chain) validate(verb verb, defaultFamily Family, defaultTable string) error {
+func (chain *Chain) validate(verb verb) error {
 	if chain.Name == "" {
 		return fmt.Errorf("no name specified for chain")
-	}
-	if chain.Table == nil {
-		chain.Table = &TableName{Family: defaultFamily, Name: defaultTable}
 	}
 
 	if chain.Hook == nil && (chain.Type != nil || chain.Priority != nil) {
 		return fmt.Errorf("regular chain %q must not specify Type or Priority", chain.Name)
 	} else if chain.Hook != nil && (chain.Type == nil || chain.Priority == nil) {
 		return fmt.Errorf("base chain %q must specify Type and Priority", chain.Name)
-	}
-
-	if chain.Priority != nil {
-		_, err := ParsePriority(chain.Table.Family, string(*chain.Priority))
-		if err != nil {
-			return fmt.Errorf("invalid base chain priority: %v", err)
-		}
 	}
 
 	switch verb {
@@ -153,14 +78,14 @@ func (chain *Chain) validate(verb verb, defaultFamily Family, defaultTable strin
 	return nil
 }
 
-func (chain *Chain) writeOperation(verb verb, writer io.Writer) {
+func (chain *Chain) writeOperation(verb verb, family Family, table string, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && chain.Handle != nil {
-		fmt.Fprintf(writer, "delete chain %s %s handle %d", chain.Table.Family, chain.Table.Name, *chain.Handle)
+		fmt.Fprintf(writer, "delete chain %s %s handle %d", family, table, *chain.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s chain %s %s %s", verb, chain.Table.Family, chain.Table.Name, chain.Name)
+	fmt.Fprintf(writer, "%s chain %s %s %s", verb, family, table, chain.Name)
 	if verb == addVerb && (chain.Type != nil || chain.Comment != nil) {
 		fmt.Fprintf(writer, " {")
 
@@ -178,41 +103,9 @@ func (chain *Chain) writeOperation(verb verb, writer io.Writer) {
 }
 
 // Object implementation for Rule
-func (rule *Rule) GetType() string {
-	return "rule"
-}
-
-func (rule *Rule) GetName() string {
-	return rule.Chain
-}
-
-func (rule *Rule) GetFamily() Family {
-	if rule.Table == nil {
-		return ""
-	}
-	return rule.Table.Family
-}
-
-func (rule *Rule) GetTable() string {
-	if rule.Table == nil {
-		return ""
-	}
-	return rule.Table.Name
-}
-
-func (rule *Rule) GetHandle() (int, error) {
-	if rule.Handle == nil {
-		return -1, fmt.Errorf("handle not set")
-	}
-	return *rule.Handle, nil
-}
-
-func (rule *Rule) validate(verb verb, defaultFamily Family, defaultTable string) error {
+func (rule *Rule) validate(verb verb) error {
 	if rule.Chain == "" {
 		return fmt.Errorf("no chain name specified for rule")
-	}
-	if rule.Table == nil {
-		rule.Table = &TableName{Family: defaultFamily, Name: defaultTable}
 	}
 
 	if rule.Index != nil && rule.Handle != nil {
@@ -226,8 +119,8 @@ func (rule *Rule) validate(verb verb, defaultFamily Family, defaultTable string)
 	return nil
 }
 
-func (rule *Rule) writeOperation(verb verb, writer io.Writer) {
-	fmt.Fprintf(writer, "%s rule %s %s %s", verb, rule.Table.Family, rule.Table.Name, rule.Chain)
+func (rule *Rule) writeOperation(verb verb, family Family, table string, writer io.Writer) {
+	fmt.Fprintf(writer, "%s rule %s %s %s", verb, family, table, rule.Chain)
 	if rule.Index != nil {
 		fmt.Fprintf(writer, " index %d", *rule.Index)
 	} else if rule.Handle != nil {
@@ -247,41 +140,9 @@ func (rule *Rule) writeOperation(verb verb, writer io.Writer) {
 }
 
 // Object implementation for Set
-func (set *Set) GetType() string {
-	return "set"
-}
-
-func (set *Set) GetName() string {
-	return set.Name
-}
-
-func (set *Set) GetFamily() Family {
-	if set.Table == nil {
-		return ""
-	}
-	return set.Table.Family
-}
-
-func (set *Set) GetTable() string {
-	if set.Table == nil {
-		return ""
-	}
-	return set.Table.Name
-}
-
-func (set *Set) GetHandle() (int, error) {
-	if set.Handle == nil {
-		return -1, fmt.Errorf("handle not set")
-	}
-	return *set.Handle, nil
-}
-
-func (set *Set) validate(verb verb, defaultFamily Family, defaultTable string) error {
+func (set *Set) validate(verb verb) error {
 	if set.Name == "" {
 		return fmt.Errorf("no name specified for set")
-	}
-	if set.Table == nil {
-		set.Table = &TableName{Family: defaultFamily, Name: defaultTable}
 	}
 
 	switch verb {
@@ -303,14 +164,14 @@ func (set *Set) validate(verb verb, defaultFamily Family, defaultTable string) e
 	return nil
 }
 
-func (set *Set) writeOperation(verb verb, writer io.Writer) {
+func (set *Set) writeOperation(verb verb, family Family, table string, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && set.Handle != nil {
-		fmt.Fprintf(writer, "delete set %s %s handle %d", set.Table.Family, set.Table.Name, *set.Handle)
+		fmt.Fprintf(writer, "delete set %s %s handle %d", family, table, *set.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s set %s %s %s", verb, set.Table.Family, set.Table.Name, set.Name)
+	fmt.Fprintf(writer, "%s set %s %s %s", verb, family, table, set.Name)
 	if verb == addVerb {
 		fmt.Fprintf(writer, " {")
 
@@ -357,42 +218,10 @@ func (set *Set) writeOperation(verb verb, writer io.Writer) {
 	fmt.Fprintf(writer, "\n")
 }
 
-// Object implementation for Set
-func (mapObj *Map) GetType() string {
-	return "map"
-}
-
-func (mapObj *Map) GetName() string {
-	return mapObj.Name
-}
-
-func (mapObj *Map) GetFamily() Family {
-	if mapObj.Table == nil {
-		return ""
-	}
-	return mapObj.Table.Family
-}
-
-func (mapObj *Map) GetTable() string {
-	if mapObj.Table == nil {
-		return ""
-	}
-	return mapObj.Table.Name
-}
-
-func (mapObj *Map) GetHandle() (int, error) {
-	if mapObj.Handle == nil {
-		return -1, fmt.Errorf("handle not set")
-	}
-	return *mapObj.Handle, nil
-}
-
-func (mapObj *Map) validate(verb verb, defaultFamily Family, defaultTable string) error {
+// Object implementation for Map
+func (mapObj *Map) validate(verb verb) error {
 	if mapObj.Name == "" {
 		return fmt.Errorf("no name specified for map")
-	}
-	if mapObj.Table == nil {
-		mapObj.Table = &TableName{Family: defaultFamily, Name: defaultTable}
 	}
 
 	switch verb {
@@ -414,14 +243,14 @@ func (mapObj *Map) validate(verb verb, defaultFamily Family, defaultTable string
 	return nil
 }
 
-func (mapObj *Map) writeOperation(verb verb, writer io.Writer) {
+func (mapObj *Map) writeOperation(verb verb, family Family, table string, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && mapObj.Handle != nil {
-		fmt.Fprintf(writer, "delete map %s %s handle %d", mapObj.Table.Family, mapObj.Table.Name, *mapObj.Handle)
+		fmt.Fprintf(writer, "delete map %s %s handle %d", family, table, *mapObj.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s map %s %s %s", verb, mapObj.Table.Family, mapObj.Table.Name, mapObj.Name)
+	fmt.Fprintf(writer, "%s map %s %s %s", verb, family, table, mapObj.Name)
 	if verb == addVerb {
 		fmt.Fprintf(writer, " {")
 
@@ -466,45 +295,16 @@ func (mapObj *Map) writeOperation(verb verb, writer io.Writer) {
 }
 
 // Object implementation for Element
-func (element *Element) GetType() string {
-	return "element"
-}
-
-func (element *Element) GetName() string {
-	return element.Name
-}
-
-func (element *Element) GetFamily() Family {
-	if element.Table == nil {
-		return ""
-	}
-	return element.Table.Family
-}
-
-func (element *Element) GetTable() string {
-	if element.Table == nil {
-		return ""
-	}
-	return element.Table.Name
-}
-
-func (element *Element) GetHandle() (int, error) {
-	return -1, fmt.Errorf("Elements do not have handles")
-}
-
-func (element *Element) validate(verb verb, defaultFamily Family, defaultTable string) error {
+func (element *Element) validate(verb verb) error {
 	if element.Name == "" {
 		return fmt.Errorf("no set/map name specified for element")
-	}
-	if element.Table == nil {
-		element.Table = &TableName{Family: defaultFamily, Name: defaultTable}
 	}
 
 	return nil
 }
 
-func (element *Element) writeOperation(verb verb, writer io.Writer) {
-	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, element.Table.Family, element.Table.Name, element.Name, element.Key)
+func (element *Element) writeOperation(verb verb, family Family, table string, writer io.Writer) {
+	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, family, table, element.Name, element.Key)
 
 	if element.Value != "" {
 		fmt.Fprintf(writer, " : %s", element.Value)
