@@ -101,7 +101,7 @@ func TestFakeRun(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error listing chains: %v", err)
 	}
-	
+
 	sort.Strings(chains)
 	expectedChains := []string{"chain", "anotherchain"}
 	sort.Strings(expectedChains)

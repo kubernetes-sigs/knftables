@@ -35,7 +35,7 @@ type execer interface {
 }
 
 // realExec implements execer by actually using os/exec
-type realExec struct {}
+type realExec struct{}
 
 // LookPath is part of execer
 func (_ realExec) LookPath(file string) (string, error) {
@@ -59,7 +59,7 @@ func (_ realExec) Run(cmd *exec.Cmd) (string, error) {
 
 // fakeExec is a mockable implementation of execer for unit tests
 type fakeExec struct {
-	t *testing.T 
+	t *testing.T
 
 	// missingBinaries is the set of binaries for which LookPath should fail
 	missingBinaries map[string]bool
