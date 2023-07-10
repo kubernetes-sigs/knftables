@@ -19,8 +19,6 @@ package nftables
 import (
 	"fmt"
 	"io"
-	"strconv"
-	"strings"
 )
 
 // Object implementation for Table
@@ -135,7 +133,7 @@ func (chain *Chain) validate(verb verb, defaultFamily Family, defaultTable strin
 	}
 
 	if chain.Priority != nil {
-		_, err := chain.ParsePriority()
+		_, err := ParsePriority(chain.Table.Family, string(*chain.Priority))
 		if err != nil {
 			return fmt.Errorf("invalid base chain priority: %v", err)
 		}
@@ -177,56 +175,6 @@ func (chain *Chain) writeOperation(verb verb, writer io.Writer) {
 	}
 
 	fmt.Fprintf(writer, "\n")
-}
-
-var numericPriorities = map[string]int{
-	"raw":      -300,
-	"mangle":   -150,
-	"dstnat":   -100,
-	"filter":   0,
-	"security": 50,
-	"srcnat":   100,
-}
-
-var bridgeNumericPriorities = map[string]int{
-	"dstnat": -300,
-	"filter": -200,
-	"out":    100,
-	"srcnat": 300,
-}
-
-// ParsePriority tries to convert the string form of chain.Priority into a number
-func (chain *Chain) ParsePriority() (int, error) {
-	if chain.Priority == nil {
-		return 0, fmt.Errorf("priority not set for chain %s", chain.Name)
-	}
-	priority := string(*chain.Priority)
-	val, err := strconv.Atoi(priority)
-	if err == nil {
-		return val, nil
-	}
-
-	modVal := 0
-	if i := strings.IndexAny(priority, "+-"); i != -1 {
-		mod := priority[i:]
-		modVal, err = strconv.Atoi(mod)
-		if err != nil {
-			return 0, fmt.Errorf("could not parse modifier %q: %v", mod, err)
-		}
-		priority = priority[:i]
-	}
-
-	var found bool
-	if chain.GetFamily() == BridgeFamily {
-		val, found = bridgeNumericPriorities[priority]
-	} else {
-		val, found = numericPriorities[priority]
-	}
-	if !found {
-		return 0, fmt.Errorf("unknown priority %q", priority)
-	}
-
-	return val + modVal, nil
 }
 
 // Object implementation for Rule

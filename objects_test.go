@@ -21,83 +21,79 @@ import (
 )
 
 func TestParsePriority(t *testing.T) {
-	makeChain := func(family Family, prio string) *Chain {
-		return &Chain{
-			Table: &TableName{
-				Family: family,
-				Name:   "test",
-			},
-			Name: "test",
-
-			Type:     Optional(FilterType),
-			Hook:     Optional(OutputHook),
-			Priority: Optional(BaseChainPriority(prio)),
-		}
-	}
-
 	for _, tc := range []struct {
 		name     string
-		chain    *Chain
+		family   Family
+		priority string
 		err      bool
-		priority int
+		out      int
 	}{
 		{
 			name:     "basic",
-			chain:    makeChain(IPv4Family, "dstnat"),
-			priority: -100,
+			family:   IPv4Family,
+			priority: "dstnat",
+			out:      -100,
 		},
 		{
 			name:     "bridge family",
-			chain:    makeChain(BridgeFamily, "dstnat"),
-			priority: -300,
+			family:   BridgeFamily,
+			priority: "dstnat",
+			out:      -300,
 		},
 		{
 			name:     "numeric",
-			chain:    makeChain(IPv4Family, "35"),
-			priority: 35,
+			family:   IPv4Family,
+			priority: "35",
+			out:      35,
 		},
 		{
 			name:     "numeric, negative",
-			chain:    makeChain(IPv4Family, "-35"),
-			priority: -35,
+			family:   IPv4Family,
+			priority: "-35",
+			out:      -35,
 		},
 		{
 			name:     "addition",
-			chain:    makeChain(IPv4Family, "srcnat+1"),
-			priority: 101,
+			family:   IPv4Family,
+			priority: "srcnat+1",
+			out:      101,
 		},
 		{
 			name:     "subtraction",
-			chain:    makeChain(IPv4Family, "srcnat-1"),
-			priority: 99,
+			family:   IPv4Family,
+			priority: "srcnat-1",
+			out:      99,
 		},
 		{
-			name:  "unknown",
-			chain: makeChain(IPv4Family, "blah"),
-			err:   true,
+			name:     "unknown",
+			family:   IPv4Family,
+			priority: "blah",
+			err:      true,
 		},
 		{
-			name:  "unknown with math",
-			chain: makeChain(IPv4Family, "blah+1"),
-			err:   true,
+			name:     "unknown with math",
+			family:   IPv4Family,
+			priority: "blah+1",
+			err:      true,
 		},
 		{
-			name:  "bad math",
-			chain: makeChain(IPv4Family, "dstnat+one"),
-			err:   true,
+			name:     "bad math",
+			family:   IPv4Family,
+			priority: "dstnat+one",
+			err:      true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			val, err := tc.chain.ParsePriority()
+			val, err := ParsePriority(tc.family, tc.priority)
 			if tc.err {
 				if err == nil {
 					t.Errorf("expected error, got %d", val)
 				}
 			} else {
 				if err != nil {
-					t.Errorf("expected %d, got error %v", tc.priority, err)
-				} else if val != tc.priority {
-					t.Errorf("expected %d, got %d", tc.priority, val)
+					t.Errorf("expected %d, got error %v", tc.out, err)
+				} else if val != tc.out {
+					t.Errorf("expected %d, got %d", tc.out, val)
 				}
 			}
 		})

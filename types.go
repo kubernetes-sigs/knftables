@@ -18,7 +18,6 @@ package nftables
 
 import (
 	"io"
-	"strings"
 	"time"
 )
 
@@ -48,11 +47,6 @@ type Object interface {
 	// writeOperation writes out an "nft" operation involving the object. It assumes
 	// that the object has been validated.
 	writeOperation(verb verb, writer io.Writer)
-}
-
-// Optional can be used to fill in optional field values
-func Optional[T any](val T) *T {
-	return &val
 }
 
 // Family is an nftables family
@@ -385,14 +379,4 @@ type Element struct {
 
 	// Comment is an optional comment for the element
 	Comment *string
-}
-
-// Join joins multiple string values together into a multi-valued set/map key/value.
-func Join(values ...string) string {
-	return strings.Join(values, " . ")
-}
-
-// Split splits an Element.Key or Element.Value into its component parts
-func Split(values string) []string {
-	return strings.Split(values, " . ")
 }
