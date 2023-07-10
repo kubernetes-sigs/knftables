@@ -27,8 +27,8 @@ import (
 )
 
 func TestFakeRun(t *testing.T) {
-	fake := NewFake()
-	tx := NewTransaction(IPv4Family, "kube-proxy")
+	fake := NewFake(IPv4Family, "kube-proxy")
+	tx := NewTransaction()
 
 	tx.Define("IP", "ip")
 
@@ -61,14 +61,9 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	tables := fake.Tables[IPv4Family]
-	if tables == nil || len(fake.Tables) != 1 {
-		t.Fatalf("unexpected contents of fake.Tables: %+v", fake.Tables)
-	}
-
-	table := tables["kube-proxy"]
-	if table == nil || len(tables) != 1 {
-		t.Fatalf("unexpected contents of fake.Tables[`ip`]: %+v", tables)
+	table := fake.Table
+	if table == nil {
+		t.Fatalf("fake.Table is nil")
 	}
 
 	chain := table.Chains["chain"]
@@ -97,7 +92,7 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("unexpected Dump content:\nexpected\n%s\n\ngot\n%s", expected, dump)
 	}
 
-	chains, err := fake.List(context.Background(), IPv4Family, "kube-proxy", "chains")
+	chains, err := fake.List(context.Background(), "chains")
 	if err != nil {
 		t.Errorf("unexpected error listing chains: %v", err)
 	}

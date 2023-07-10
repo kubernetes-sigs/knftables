@@ -94,9 +94,13 @@ func TestListBad(t *testing.T) {
 					err:    nftErr,
 				},
 			)
-			nft := &realNFTables{fexec}
+			nft := &realNFTables{
+				family: IPv4Family,
+				table:  "testing",
+				exec:   fexec,
+			}
 
-			result, err := nft.List(context.Background(), IPv4Family, "testing", "chains")
+			result, err := nft.List(context.Background(), "chains")
 			if result != nil {
 				t.Errorf("unexpected non-nil result: %v", result)
 			}
@@ -141,9 +145,13 @@ func TestList(t *testing.T) {
 					stdout: tc.nftOutput,
 				},
 			)
-			nft := &realNFTables{fexec}
+			nft := &realNFTables{
+				family: IPv4Family,
+				table:  "testing",
+				exec:   fexec,
+			}
 
-			result, err := nft.List(context.Background(), IPv4Family, "testing", tc.objType)
+			result, err := nft.List(context.Background(), tc.objType)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -156,9 +164,13 @@ func TestList(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	fexec := newFakeExec(t)
-	nft := &realNFTables{fexec}
+	nft := &realNFTables{
+		family: IPv4Family,
+		table:  "kube-proxy",
+		exec:   fexec,
+	}
 
-	tx := NewTransaction(IPv4Family, "kube-proxy")
+	tx := NewTransaction()
 	tx.Define("IP", "ip")
 
 	tx.Add(&Table{})

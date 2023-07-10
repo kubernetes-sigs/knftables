@@ -25,8 +25,11 @@ import (
 
 // Fake is a fake implementation of Interface
 type Fake struct {
-	// Tables contains the defined tables, keyed by family and name
-	Tables map[Family]map[string]*FakeTable
+	family Family
+	table  string
+
+	// Table contains the Interface's table, if it has been added
+	Table *FakeTable
 }
 
 // FakeTable wraps Table for the Fake implementation
@@ -59,9 +62,11 @@ type FakeMap struct {
 	Elements []*Element
 }
 
-func NewFake() *Fake {
+// NewFake creates a new fake Interface, for unit tests
+func NewFake(family Family, table string) *Fake {
 	return &Fake{
-		Tables: make(map[Family]map[string]*FakeTable),
+		family: family,
+		table:  table,
 	}
 }
 
@@ -73,25 +78,24 @@ func (fake *Fake) Present() error {
 }
 
 // List is part of Interface.
-func (fake *Fake) List(ctx context.Context, family Family, tableName, objectType string) ([]string, error) {
-	table := fake.Tables[family][tableName]
-	if table == nil {
-		return nil, fmt.Errorf("no such table %q", tableName)
+func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error) {
+	if fake.Table == nil {
+		return nil, fmt.Errorf("no such table %q", fake.table)
 	}
 
 	var result []string
 
 	switch objectType {
 	case "chain", "chains":
-		for name := range table.Chains {
+		for name := range fake.Table.Chains {
 			result = append(result, name)
 		}
 	case "set", "sets":
-		for name := range table.Sets {
+		for name := range fake.Table.Sets {
 			result = append(result, name)
 		}
 	case "map", "maps":
-		for name := range table.Maps {
+		for name := range fake.Table.Maps {
 			result = append(result, name)
 		}
 
@@ -118,14 +122,9 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 	// FIXME: not actually transactional!
 
 	for _, op := range tx.operations {
-		tables := fake.Tables[tx.family]
-		if tables == nil {
-			fake.Tables[tx.family] = make(map[string]*FakeTable)
-		}
-		existingTable := fake.Tables[tx.family][tx.table]
-		if existingTable == nil {
+		if fake.Table == nil {
 			if _, ok := op.obj.(*Table); !ok || op.verb != addVerb {
-				return fmt.Errorf("no such table \"%s %s\"", tx.family, tx.table)
+				return fmt.Errorf("no such table \"%s %s\"", fake.family, fake.table)
 			}
 		}
 
@@ -133,12 +132,11 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		case *Table:
 			switch op.verb {
 			case flushVerb:
-				delete(fake.Tables[tx.family], tx.table)
-				existingTable = nil
+				fake.Table = nil
 				fallthrough
 			case addVerb:
-				if existingTable == nil {
-					fake.Tables[tx.family][tx.table] = &FakeTable{
+				if fake.Table == nil {
+					fake.Table = &FakeTable{
 						Table:  *obj,
 						Chains: make(map[string]*FakeChain),
 						Sets:   make(map[string]*FakeSet),
@@ -146,12 +144,12 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					}
 				}
 			case deleteVerb:
-				delete(fake.Tables[tx.family], tx.table)
+				fake.Table = nil
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Chain:
-			existingChain := existingTable.Chains[obj.Name]
+			existingChain := fake.Table.Chains[obj.Name]
 			if existingChain == nil && op.verb != addVerb {
 				return fmt.Errorf("no such chain %q", obj.Name)
 			}
@@ -160,19 +158,19 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				if existingChain != nil {
 					continue
 				}
-				existingTable.Chains[obj.Name] = &FakeChain{
+				fake.Table.Chains[obj.Name] = &FakeChain{
 					Chain: *obj,
 				}
 			case flushVerb:
 				existingChain.Rules = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(existingTable.Chains, obj.Name)
+				delete(fake.Table.Chains, obj.Name)
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Rule:
-			existingChain := existingTable.Chains[obj.Chain]
+			existingChain := fake.Table.Chains[obj.Chain]
 			if existingChain == nil {
 				return fmt.Errorf("no such chain %q", obj.Chain)
 			}
@@ -188,7 +186,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Set:
-			existingSet := existingTable.Sets[obj.Name]
+			existingSet := fake.Table.Sets[obj.Name]
 			if existingSet == nil && op.verb != addVerb {
 				return fmt.Errorf("no such set %q", obj.Name)
 			}
@@ -200,19 +198,19 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				set := *obj
 				set.Type = substituteDefines(set.Type, tx)
 				set.TypeOf = substituteDefines(set.TypeOf, tx)
-				existingTable.Sets[obj.Name] = &FakeSet{
+				fake.Table.Sets[obj.Name] = &FakeSet{
 					Set: set,
 				}
 			case flushVerb:
 				existingSet.Elements = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(existingTable.Sets, obj.Name)
+				delete(fake.Table.Sets, obj.Name)
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Map:
-			existingMap := existingTable.Maps[obj.Name]
+			existingMap := fake.Table.Maps[obj.Name]
 			if existingMap == nil && op.verb != addVerb {
 				return fmt.Errorf("no such map %q", obj.Name)
 			}
@@ -224,20 +222,20 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				mapObj := *obj
 				mapObj.Type = substituteDefines(mapObj.Type, tx)
 				mapObj.TypeOf = substituteDefines(mapObj.TypeOf, tx)
-				existingTable.Maps[obj.Name] = &FakeMap{
+				fake.Table.Maps[obj.Name] = &FakeMap{
 					Map: mapObj,
 				}
 			case flushVerb:
 				existingMap.Elements = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(existingTable.Maps, obj.Name)
+				delete(fake.Table.Maps, obj.Name)
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Element:
 			if len(obj.Value) == 0 {
-				existingSet := existingTable.Sets[obj.Name]
+				existingSet := fake.Table.Sets[obj.Name]
 				if existingSet == nil {
 					return fmt.Errorf("no such set %q", obj.Name)
 				}
@@ -253,7 +251,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					return fmt.Errorf("unhandled operation %q", op.verb)
 				}
 			} else {
-				existingMap := existingTable.Maps[obj.Name]
+				existingMap := fake.Table.Maps[obj.Name]
 				if existingMap == nil {
 					return fmt.Errorf("no such map %q", obj.Name)
 				}
@@ -282,39 +280,38 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 // but not actually guaranteed to be usable as such. (e.g., chains may be referenced
 // before they are created, etc)
 func (fake *Fake) Dump() string {
+	if fake.Table == nil {
+		return ""
+	}
+
 	buf := &strings.Builder{}
 
-	for _, family := range sortKeys(fake.Tables) {
-		tables := fake.Tables[Family(family)]
-		for _, tname := range sortKeys(tables) {
-			table := tables[tname]
-			table.writeOperation(addVerb, family, tname, buf)
+	table := fake.Table
+	table.writeOperation(addVerb, fake.family, fake.table, buf)
 
-			for _, cname := range sortKeys(table.Chains) {
-				ch := table.Chains[cname]
-				ch.writeOperation(addVerb, family, tname, buf)
+	for _, cname := range sortKeys(table.Chains) {
+		ch := table.Chains[cname]
+		ch.writeOperation(addVerb, fake.family, fake.table, buf)
 
-				for _, rule := range ch.Rules {
-					rule.writeOperation(addVerb, family, tname, buf)
-				}
-			}
+		for _, rule := range ch.Rules {
+			rule.writeOperation(addVerb, fake.family, fake.table, buf)
+		}
+	}
 
-			for _, sname := range sortKeys(table.Sets) {
-				s := table.Sets[sname]
-				s.writeOperation(addVerb, family, tname, buf)
+	for _, sname := range sortKeys(table.Sets) {
+		s := table.Sets[sname]
+		s.writeOperation(addVerb, fake.family, fake.table, buf)
 
-				for _, element := range s.Elements {
-					element.writeOperation(addVerb, family, tname, buf)
-				}
-			}
-			for _, mname := range sortKeys(table.Maps) {
-				m := table.Maps[mname]
-				m.writeOperation(addVerb, family, tname, buf)
+		for _, element := range s.Elements {
+			element.writeOperation(addVerb, fake.family, fake.table, buf)
+		}
+	}
+	for _, mname := range sortKeys(table.Maps) {
+		m := table.Maps[mname]
+		m.writeOperation(addVerb, fake.family, fake.table, buf)
 
-				for _, element := range m.Elements {
-					element.writeOperation(addVerb, family, tname, buf)
-				}
-			}
+		for _, element := range m.Elements {
+			element.writeOperation(addVerb, fake.family, fake.table, buf)
 		}
 	}
 

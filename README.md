@@ -17,7 +17,7 @@ Create an `Interface` object to manage operations on a single nftables
 table:
 
 ```golang
-nft := nftables.New()
+nft := nftables.New(nftables.IPv4Family, "my-table")
 
 // Make sure nftables actually works here
 if err := nft.Present(); err != nil {
@@ -28,7 +28,7 @@ if err := nft.Present(); err != nil {
 Use the `List` method on the `Interface` to check if objects exist:
 
 ```golang
-chains, err := nft.List(ctx, nftables.IPv4Family, "my-table", "chains")
+chains, err := nft.List(ctx, "chains")
 if err != nil {
         return fmt.Errorf("could not list chains: %v", err)
 }
@@ -40,7 +40,7 @@ To make changes, create a `Transaction`, add the appropriate
 operations to the transaction, and then call `nft.Run` on it:
 
 ```golang
-tx := nftables.NewTransaction(nftables.IPv4Family, "my-table")
+tx := nftables.NewTransaction()
 
 tx.Add(&nftables.Chain{
         Name:    "mychain",
@@ -55,10 +55,6 @@ tx.AddRule("mychain",
         "jump", destChain,
 )
 ```
-
-NOTE: I may move the family and table name specification from the
-`Transaction` to the `Interface`, such that a given
-`nftables.Interface` _only_ works with a single table.
 
 ## `nftables.Transaction` operations
 

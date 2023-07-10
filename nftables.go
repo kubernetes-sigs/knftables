@@ -29,8 +29,8 @@ type Interface interface {
 	Present() error
 
 	// List returns a list of the names of the objects of objectType ("chain", "set",
-	// or "map") in the indicated table.
-	List(ctx context.Context, family Family, tableName, objectType string) ([]string, error)
+	// or "map")
+	List(ctx context.Context, objectType string) ([]string, error)
 
 	// Run runs a Transaction and returns the result
 	Run(ctx context.Context, tx *Transaction) error
@@ -38,11 +38,17 @@ type Interface interface {
 
 // realNFTables is an implementation of Interface
 type realNFTables struct {
+	family Family
+	table  string
+
 	exec execer
 }
 
-func New() Interface {
+func New(family Family, table string) Interface {
 	return &realNFTables{
+		family: family,
+		table:  table,
+
 		exec: realExec{},
 	}
 }
@@ -53,7 +59,7 @@ func (nft *realNFTables) Present() error {
 		return fmt.Errorf("could not run nftables binary: %v", err)
 	}
 
-	cmd := exec.Command("nft", "--check", "add", "table", "testing")
+	cmd := exec.Command("nft", "--check", "add", "table", string(nft.family), nft.table)
 	_, err := nft.exec.Run(cmd)
 	return err
 }
@@ -64,7 +70,7 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 		return tx.err
 	}
 
-	buf, err := tx.asCommandBuf()
+	buf, err := tx.asCommandBuf(nft.family, nft.table)
 	if err != nil {
 		return err
 	}
@@ -86,7 +92,7 @@ func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 }
 
 // List is part of Interface.
-func (nft *realNFTables) List(ctx context.Context, family Family, tableName, objectType string) ([]string, error) {
+func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
 	// All currently-existing nftables object types have plural forms that are just
 	// the singular form plus 's'.
 	var typeSingular, typePlural string
@@ -98,7 +104,7 @@ func (nft *realNFTables) List(ctx context.Context, family Family, tableName, obj
 		typePlural = objectType + "s"
 	}
 
-	cmd := exec.CommandContext(ctx, "nft", "-j", "list", typePlural, string(family))
+	cmd := exec.CommandContext(ctx, "nft", "-j", "list", typePlural, string(nft.family))
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %v", err)
@@ -150,7 +156,7 @@ func (nft *realNFTables) List(ctx context.Context, family Family, tableName, obj
 			continue
 		}
 		objTable, _ := jsonVal[string](obj, "table")
-		if objTable != tableName {
+		if objTable != nft.table {
 			continue
 		}
 
