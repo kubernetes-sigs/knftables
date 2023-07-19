@@ -243,10 +243,18 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				case addVerb:
 					element := *obj
 					element.Key = substituteDefines(element.Key, tx)
-					existingSet.Elements = append(existingSet.Elements, &element)
+					if i := findElement(existingSet.Elements, element.Key); i != -1 {
+						existingSet.Elements[i] = &element
+					} else {
+						existingSet.Elements = append(existingSet.Elements, &element)
+					}
 				case deleteVerb:
-					// FIXME
-					return fmt.Errorf("unimplemented operation %q", op.verb)
+					key := substituteDefines(obj.Key, tx)
+					if i := findElement(existingSet.Elements, obj.Key); i != -1 {
+						existingSet.Elements = append(existingSet.Elements[:i], existingSet.Elements[i+1:]...)
+					} else {
+						return fmt.Errorf("no such element %q", key)
+					}
 				default:
 					return fmt.Errorf("unhandled operation %q", op.verb)
 				}
@@ -260,10 +268,18 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					element := *obj
 					element.Key = substituteDefines(element.Key, tx)
 					element.Value = substituteDefines(element.Value, tx)
-					existingMap.Elements = append(existingMap.Elements, &element)
+					if i := findElement(existingMap.Elements, element.Key); i != -1 {
+						existingMap.Elements[i] = &element
+					} else {
+						existingMap.Elements = append(existingMap.Elements, &element)
+					}
 				case deleteVerb:
-					// FIXME
-					return fmt.Errorf("unimplemented operation %q", op.verb)
+					key := substituteDefines(obj.Key, tx)
+					if i := findElement(existingMap.Elements, obj.Key); i != -1 {
+						existingMap.Elements = append(existingMap.Elements[:i], existingMap.Elements[i+1:]...)
+					} else {
+						return fmt.Errorf("no such element %q", key)
+					}
 				default:
 					return fmt.Errorf("unhandled operation %q", op.verb)
 				}
@@ -325,4 +341,29 @@ func sortKeys[K ~string, V any](m map[K]V) []K {
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	return keys
+}
+
+func findElement(elements []*Element, key string) int {
+	for i := range elements {
+		if elements[i].Key == key {
+			return i
+		}
+	}
+	return -1
+}
+
+func (s *FakeSet) FindElement(key ...string) *Element {
+	index := findElement(s.Elements, Join(key...))
+	if index == -1 {
+		return nil
+	}
+	return s.Elements[index]
+}
+
+func (m *FakeMap) FindElement(key ...string) *Element {
+	index := findElement(m.Elements, Join(key...))
+	if index == -1 {
+		return nil
+	}
+	return m.Elements[index]
 }

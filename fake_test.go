@@ -56,6 +56,27 @@ func TestFakeRun(t *testing.T) {
 		Comment: Optional("reject rule"),
 	})
 
+	tx.Add(&Map{
+		Name: "map1",
+		Type: "ipv4_addr . inet_proto . inet_service : verdict",
+	})
+	tx.Add(&Element{
+		Name:  "map1",
+		Key:   "192.168.0.1 . tcp . 80",
+		Value: "goto chain",
+	})
+	tx.Add(&Element{
+		Name:  "map1",
+		Key:   Join("192.168.0.2", "tcp", "443"),
+		Value: "goto anotherchain",
+	})
+	// Duplicate element
+	tx.Add(&Element{
+		Name:  "map1",
+		Key:   Join("192.168.0.1", "tcp", "80"),
+		Value: "drop",
+	})
+
 	err := fake.Run(context.Background(), tx)
 	if err != nil {
 		t.Fatalf("unexpected error from Run: %v", err)
@@ -79,6 +100,27 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected chain.Rules content: expected %q, got %q", expectedRule, chain.Rules[0].Rule)
 	}
 
+	m := table.Maps["map1"]
+	if m == nil || len(table.Maps) != 1 {
+		t.Fatalf("unexpected contents of table.Maps: %+v", table.Maps)
+	}
+
+	elem := m.FindElement("192.168.0.2 . tcp . 443")
+	if elem == nil || elem.Value != "goto anotherchain" {
+		t.Fatalf("missing map element for key \"192.168.0.2 . tcp . 443\"")
+	} else if elem.Value != "goto anotherchain" {
+		t.Fatalf("unexpected map element for key \"192.168.0.2 . tcp . 443\": %+v", elem)
+	}
+
+	elem = m.FindElement("192.168.0.1", "tcp", "80")
+	if elem == nil {
+		t.Fatalf("missing map element for key \"192.168.0.1 . tcp . 80\"")
+	} else if elem.Value == "goto chain" {
+		t.Fatalf("map element for key \"192.168.0.1 . tcp . 80\" did not get overwritten")
+	} else if elem.Value != "drop" {
+		t.Fatalf("unexpected map element for key \"192.168.0.1 . tcp . 80\": %+v", elem)
+	}
+
 	expected := strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
 		add chain ip kube-proxy anotherchain
@@ -86,6 +128,9 @@ func TestFakeRun(t *testing.T) {
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
+		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
+		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 : goto anotherchain }
 		`), "\n")
 	dump := fake.Dump()
 	if dump != expected {
