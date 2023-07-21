@@ -18,6 +18,7 @@ package nftables
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -41,6 +42,10 @@ func TestFakeRun(t *testing.T) {
 		Chain: "chain",
 		Rule:  "$IP daddr 10.0.0.0/8 drop",
 	})
+	tx.AddRule("chain",
+		"masquerade",
+		"comment", fmt.Sprintf("%q", "comment via AddRule"),
+	)
 
 	tx.Add(&Chain{
 		Name: "anotherchain",
@@ -92,12 +97,22 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected contents of table.Chains: %+v", table.Chains)
 	}
 
-	if len(chain.Rules) != 1 {
-		t.Fatalf("unexpected chain.Rules length: expected 1, got %d", len(chain.Rules))
+	if len(chain.Rules) != 2 {
+		t.Fatalf("unexpected chain.Rules length: expected 2, got %d", len(chain.Rules))
 	}
 	expectedRule := "ip daddr 10.0.0.0/8 drop"
 	if chain.Rules[0].Rule != expectedRule {
 		t.Fatalf("unexpected chain.Rules content: expected %q, got %q", expectedRule, chain.Rules[0].Rule)
+	}
+	expectedRule = "masquerade"
+	if chain.Rules[1].Rule != expectedRule {
+		t.Fatalf("unexpected chain.Rules content: expected %q, got %q", expectedRule, chain.Rules[1].Rule)
+	}
+	expectedComment := "comment via AddRule"
+	if chain.Rules[1].Comment == nil {
+		t.Fatalf("unexpected chain.Rules content: expected comment %q, got nil", expectedComment)
+	} else if *chain.Rules[1].Comment != expectedComment {
+		t.Fatalf("unexpected chain.Rules content: expected comment %q, got %q", expectedComment, *chain.Rules[1].Comment)
 	}
 
 	m := table.Maps["map1"]
@@ -128,6 +143,7 @@ func TestFakeRun(t *testing.T) {
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add rule ip kube-proxy chain masquerade comment "comment via AddRule"
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 : goto anotherchain }

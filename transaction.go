@@ -130,7 +130,8 @@ func (tx *Transaction) Delete(obj Object) {
 }
 
 // AddRule is a helper for adding Rule objects. It takes a series of string and []string
-// arguments and concatenates them together into a single rule.
+// arguments and concatenates them together into a single rule. As with "nft add rule",
+// you may include a comment (which must be quoted) as the last clause of the rule.
 func (tx *Transaction) AddRule(chain string, args ...interface{}) {
 	if tx.err != nil {
 		return
@@ -156,8 +157,10 @@ func (tx *Transaction) AddRule(chain string, args ...interface{}) {
 		}
 	}
 
+	rule, comment := splitComment(buf.String())
 	tx.Add(&Rule{
-		Chain: chain,
-		Rule:  buf.String(),
+		Chain:   chain,
+		Rule:    rule,
+		Comment: comment,
 	})
 }
