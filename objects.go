@@ -124,7 +124,7 @@ func (rule *Rule) writeOperation(verb verb, family Family, table string, writer 
 	if rule.Index != nil {
 		fmt.Fprintf(writer, " index %d", *rule.Index)
 	} else if rule.Handle != nil {
-		fmt.Fprintf(writer, " handle %d", *rule.Index)
+		fmt.Fprintf(writer, " handle %d", *rule.Handle)
 	}
 
 	switch verb {

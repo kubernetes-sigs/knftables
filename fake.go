@@ -28,6 +28,8 @@ type Fake struct {
 	family Family
 	table  string
 
+	nextHandle int
+
 	// Table contains the Interface's table, if it has been added
 	Table *FakeTable
 }
@@ -159,6 +161,10 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			}
 		}
 
+		if op.verb == addVerb || op.verb == createVerb {
+			fake.nextHandle++
+		}
+
 		switch obj := op.obj.(type) {
 		case *Table:
 			switch op.verb {
@@ -167,8 +173,10 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				fallthrough
 			case addVerb:
 				if fake.Table == nil {
+					table := *obj
+					table.Handle = Optional(fake.nextHandle)
 					fake.Table = &FakeTable{
-						Table:  *obj,
+						Table:  table,
 						Chains: make(map[string]*FakeChain),
 						Sets:   make(map[string]*FakeSet),
 						Maps:   make(map[string]*FakeMap),
@@ -189,8 +197,10 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				if existingChain != nil {
 					continue
 				}
+				chain := *obj
+				chain.Handle = Optional(fake.nextHandle)
 				fake.Table.Chains[obj.Name] = &FakeChain{
-					Chain: *obj,
+					Chain: chain,
 				}
 			case flushVerb:
 				existingChain.Rules = nil
@@ -209,10 +219,14 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			case addVerb:
 				rule := *obj
 				rule.Rule = substituteDefines(rule.Rule, tx)
+				rule.Handle = Optional(fake.nextHandle)
 				existingChain.Rules = append(existingChain.Rules, &rule)
 			case deleteVerb:
-				// FIXME
-				return fmt.Errorf("unimplemented operation %q", op.verb)
+				if i := findRule(existingChain.Rules, *obj.Handle); i != -1 {
+					existingChain.Rules = append(existingChain.Rules[:i], existingChain.Rules[i+1:]...)
+				} else {
+					return fmt.Errorf("no rule with handle %d", *obj.Handle)
+				}
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
@@ -229,6 +243,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				set := *obj
 				set.Type = substituteDefines(set.Type, tx)
 				set.TypeOf = substituteDefines(set.TypeOf, tx)
+				set.Handle = Optional(fake.nextHandle)
 				fake.Table.Sets[obj.Name] = &FakeSet{
 					Set: set,
 				}
@@ -253,6 +268,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				mapObj := *obj
 				mapObj.Type = substituteDefines(mapObj.Type, tx)
 				mapObj.TypeOf = substituteDefines(mapObj.TypeOf, tx)
+				mapObj.Handle = Optional(fake.nextHandle)
 				fake.Table.Maps[obj.Name] = &FakeMap{
 					Map: mapObj,
 				}
@@ -341,7 +357,11 @@ func (fake *Fake) Dump() string {
 		ch.writeOperation(addVerb, fake.family, fake.table, buf)
 
 		for _, rule := range ch.Rules {
-			rule.writeOperation(addVerb, fake.family, fake.table, buf)
+			// Avoid outputing handles
+			dumpRule := *rule
+			dumpRule.Handle = nil
+			dumpRule.Index = nil
+			dumpRule.writeOperation(addVerb, fake.family, fake.table, buf)
 		}
 	}
 
@@ -372,6 +392,15 @@ func sortKeys[K ~string, V any](m map[K]V) []K {
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	return keys
+}
+
+func findRule(rules []*Rule, handle int) int {
+	for i := range rules {
+		if rules[i].Handle != nil && *rules[i].Handle == handle {
+			return i
+		}
+	}
+	return -1
 }
 
 func findElement(elements []*Element, key string) int {

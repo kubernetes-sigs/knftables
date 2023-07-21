@@ -114,6 +114,8 @@ func TestFakeRun(t *testing.T) {
 	} else if *chain.Rules[1].Comment != expectedComment {
 		t.Fatalf("unexpected chain.Rules content: expected comment %q, got %q", expectedComment, *chain.Rules[1].Comment)
 	}
+	// Save this Rule object for later
+	ruleToDelete := chain.Rules[1]
 
 	m := table.Maps["map1"]
 	if m == nil || len(table.Maps) != 1 {
@@ -163,5 +165,27 @@ func TestFakeRun(t *testing.T) {
 	sort.Strings(expectedChains)
 	if !reflect.DeepEqual(chains, expectedChains) {
 		t.Errorf("unexpected result from List(chains): %v", chains)
+	}
+
+	tx = NewTransaction()
+	tx.Delete(ruleToDelete)
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+	expected = strings.TrimPrefix(dedent.Dedent(`
+		add table ip kube-proxy
+		add chain ip kube-proxy anotherchain
+		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
+		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
+		add chain ip kube-proxy chain { comment "foo" ; }
+		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
+		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
+		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 : goto anotherchain }
+		`), "\n")
+	dump = fake.Dump()
+	if dump != expected {
+		t.Errorf("unexpected Dump content after delete:\nexpected\n%s\n\ngot\n%s", expected, dump)
 	}
 }
