@@ -106,6 +106,37 @@ func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error)
 	return result, nil
 }
 
+// ListRules is part of Interface
+func (fake *Fake) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
+	if fake.Table == nil {
+		return nil, fmt.Errorf("no such chain %q", chain)
+	}
+	ch := fake.Table.Chains[chain]
+	if ch == nil {
+		return nil, fmt.Errorf("no such chain %q", chain)
+	}
+	return ch.Rules, nil
+}
+
+// ListElements is part of Interface
+func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
+	if fake.Table == nil {
+		return nil, fmt.Errorf("no such %s %q", objectType, name)
+	}
+	if objectType == "set" {
+		s := fake.Table.Sets[name]
+		if s != nil {
+			return s.Elements, nil
+		}
+	} else if objectType == "map" {
+		m := fake.Table.Maps[name]
+		if m != nil {
+			return m.Elements, nil
+		}
+	}
+	return nil, fmt.Errorf("no such %s %q", objectType, name)
+}
+
 func substituteDefines(val string, tx *Transaction) string {
 	for _, def := range tx.defines {
 		val = strings.ReplaceAll(val, "$"+def.name, def.value)

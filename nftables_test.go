@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 )
 
@@ -89,7 +90,7 @@ func TestListBad(t *testing.T) {
 			fexec := newFakeExec(t)
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "-j", "list", "chains", "ip"},
+					args:   []string{"nft", "--json", "list", "chains", "ip"},
 					stdout: tc.nftOutput,
 					err:    nftErr,
 				},
@@ -141,7 +142,7 @@ func TestList(t *testing.T) {
 			fexec := newFakeExec(t)
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "-j", "list", "chains", "ip"},
+					args:   []string{"nft", "--json", "list", "chains", "ip"},
 					stdout: tc.nftOutput,
 				},
 			)
@@ -199,5 +200,436 @@ func TestRun(t *testing.T) {
 	err := nft.Run(context.Background(), tx)
 	if err != nil {
 		t.Errorf("unexpected error from Run: %v", err)
+	}
+}
+
+func Test_splitComment(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		line    string
+		rule    string
+		comment *string
+	}{
+		{
+			name:    "empty",
+			line:    "",
+			rule:    "",
+			comment: nil,
+		},
+		{
+			name:    "no comment",
+			line:    "ip saddr 1.2.3.4 drop",
+			rule:    "ip saddr 1.2.3.4 drop",
+			comment: nil,
+		},
+		{
+			name:    "simple comment",
+			line:    `ip saddr 1.2.3.4 drop comment "I don't like him"`,
+			rule:    "ip saddr 1.2.3.4 drop",
+			comment: Optional("I don't like him"),
+		},
+		{
+			name:    "empty comment",
+			line:    `ip saddr 1.2.3.4 drop comment ""`,
+			rule:    "ip saddr 1.2.3.4 drop",
+			comment: Optional(""),
+		},
+		{
+			name:    "tricky comment",
+			line:    `ip saddr 1.2.3.4 drop comment "I have no comment "`,
+			rule:    "ip saddr 1.2.3.4 drop",
+			comment: Optional("I have no comment "),
+		},
+		{
+			name:    "not a comment",
+			line:    `iifname "comment " drop`,
+			rule:    `iifname "comment " drop`,
+			comment: nil,
+		},
+		{
+			name:    "not a comment plus a comment",
+			line:    `iifname "comment " drop comment "fooled ya?"`,
+			rule:    `iifname "comment " drop`,
+			comment: Optional("fooled ya?"),
+		},
+		{
+			name:    "not a comment plus tricky comment",
+			line:    `iifname "comment " drop comment "comment "`,
+			rule:    `iifname "comment " drop`,
+			comment: Optional("comment "),
+		},
+	} {
+		t.Run(tc.name, func (t *testing.T) {
+			rule, comment := splitComment(tc.line)
+			if rule != tc.rule {
+				t.Errorf("bad rule: expected %q got %q", tc.rule, rule)
+			}
+			if comment == nil {
+				if tc.comment != nil {
+					t.Errorf("bad comment: expected %q got nil", *tc.comment)
+				}
+			} else if tc.comment == nil {
+				t.Errorf("bad comment: expected nil got %q", *comment)
+			} else if *comment != *tc.comment {
+				t.Errorf("bad comment: expected %q got %q", *tc.comment, *comment)
+			}
+		})
+	}
+}
+
+func Test_splitMapValue(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		line    string
+		key     string
+		comment *string
+		value   string
+	}{
+		{
+			name:    "empty (bad)",
+			line:    "",
+			key:     "",
+			comment: nil,
+			value:   "",
+		},
+		{
+			name:    "simple",
+			line:    "192.168.0.1 . tcp . 80 : drop",
+			key:     "192.168.0.1 . tcp . 80",
+			comment: nil,
+			value:   "drop",
+		},
+		{
+			name:    "with comment",
+			line:    `192.168.0.1 . tcp . 80 comment "hello" : drop`,
+			key:     "192.168.0.1 . tcp . 80",
+			comment: Optional("hello"),
+			value:   "drop",
+		},
+		{
+			name:    "tricky comment #1",
+			line:    `192.168.0.1 . tcp . 80 comment " : " : drop`,
+			key:     "192.168.0.1 . tcp . 80",
+			comment: Optional(" : "),
+			value:   "drop",
+		},
+		{
+			name:    "tricky comment #2",
+			line:    `192.168.0.1 . tcp . 80 comment " no comment " : drop`,
+			key:     "192.168.0.1 . tcp . 80",
+			comment: Optional(" no comment "),
+			value:   "drop",
+		},
+		{
+			name:    "tricky key",
+			line:    `192.168.0.1 . " comment " . 80 : drop`,
+			key:     `192.168.0.1 . " comment " . 80`,
+			comment: nil,
+			value:   "drop",
+		},
+		{
+			name:    "tricky key with comment",
+			line:    `192.168.0.1 . " comment " . 80 comment "weird" : drop`,
+			key:     `192.168.0.1 . " comment " . 80`,
+			comment: Optional("weird"),
+			value:   "drop",
+		},
+		{
+			name:    "tricky value #1",
+			line:    `192.168.0.1 . tcp . 80 : " comment "`,
+			key:     `192.168.0.1 . tcp . 80`,
+			comment: nil,
+			value:   `" comment "`,
+		},
+		{
+			name:    "tricky value #2",
+			line:    `192.168.0.1 . tcp . 80 : " : drop "`,
+			key:     `192.168.0.1 . tcp . 80`,
+			comment: nil,
+			value:   `" : drop "`,
+		},
+	} {
+		t.Run(tc.name, func (t *testing.T) {
+			key, comment, value := splitMapValue(tc.line)
+			if key != tc.key {
+				t.Errorf("bad key: expected %q got %q", tc.key, key)
+			}
+			if value != tc.value {
+				t.Errorf("bad value: expected %q got %q", tc.value, value)
+			}
+			if comment == nil {
+				if tc.comment != nil {
+					t.Errorf("bad comment: expected %q got nil", *tc.comment)
+				}
+			} else if tc.comment == nil {
+				t.Errorf("bad comment: expected nil got %q", *comment)
+			} else if *comment != *tc.comment {
+				t.Errorf("bad comment: expected %q got %q", *tc.comment, *comment)
+			}
+		})
+	}
+}
+
+func TestListRules(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		nftOutput  string
+		nftError   string
+		listOutput []*Rule
+	}{
+		{
+			name:     "no such chain",
+			nftError: "Error: No such file or directory\nlist chain ip testing testchain\n                      ^^^^^^^^^\n",
+		},
+		{
+			name:       "no output",
+			nftOutput:  ``,
+			listOutput: []*Rule{},
+		},
+		{
+			name:      "no rules",
+			nftOutput: `
+				table ip testing { # handle 1
+					chain testchain { # handle 165
+					}
+				}`,
+			listOutput: []*Rule{},
+		},
+		{
+			name:      "no rules",
+			nftOutput: `
+				table ip testing { # handle 1
+					chain testchain { # handle 165
+						# this line is a comment, and the next is not a rule
+						type filter hook input priority filter + 10; policy accept;
+						# no handle; shouldn't happen, but should be ignored
+						ip daddr 10.0.0.1
+						# bad handle; shouldn't happen, but should be ignored
+						ip daddr 10.0.0.1 # handle bob
+					}
+				}`,
+			listOutput: []*Rule{},
+		},
+		{
+			name:      "normal output",
+			nftOutput: `
+				table ip testing { # handle 1
+				  yeah I don't think nftables ever actually outputs random extra lines like this but maybe?
+					chain testchain { # handle 165
+						type filter hook input priority filter + 10; policy accept;
+						ct state { established, related } accept # handle 169
+						ct status dnat accept comment "This rule does something" # handle 170
+						iifname "lo" accept # handle 171
+					}
+				}`,
+			listOutput: []*Rule{
+				&Rule{
+					Chain: "testchain",
+					Rule: "ct state { established, related } accept",
+					Handle: Optional(169),
+				},
+				&Rule{
+					Chain: "testchain",
+					Rule: "ct status dnat accept",
+					Comment: Optional("This rule does something"),
+					Handle: Optional(170),
+				},
+				&Rule{
+					Chain: "testchain",
+					Rule: `iifname "lo" accept`,
+					Handle: Optional(171),
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fexec := newFakeExec(t)
+			var err error
+			if tc.nftError != "" {
+				err = fmt.Errorf(tc.nftError)
+			}
+			fexec.expected = append(fexec.expected,
+				expectedCmd{
+					args:   []string{"nft", "--handle", "list", "chain", "ip", "testing", "testchain"},
+					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
+					err:    err,
+				},
+			)
+			nft := &realNFTables{
+				family: IPv4Family,
+				table:  "testing",
+				exec:   fexec,
+			}
+
+			result, err := nft.ListRules(context.Background(), "testchain")
+			if err != nil {
+				if tc.nftError == "" {
+					t.Errorf("unexpected error: %v", err)
+				}
+				return
+			} else if tc.nftError != "" {
+				t.Errorf("unexpected non-error")
+				return
+			}
+
+			diff := cmp.Diff(tc.listOutput, result)
+			if diff != "" {
+				t.Errorf("unexpected result:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestListElements(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		objectType string
+		nftOutput  string
+		nftError   string
+		listOutput []*Element
+	}{
+		{
+			name:       "no such set",
+			objectType: "set",
+			nftError:   "Error: No such file or directory\nlist set ip testing test\n                    ^^^^\n",
+		},
+		{
+			name:       "no output",
+			objectType: "set",
+			nftOutput:  ``,
+			listOutput: []*Element{},
+		},
+		{
+			name:       "no elements",
+			objectType: "set",
+			nftOutput:  `
+				table ip testing {
+					set test {
+						type ipv4_addr . inet_proto . inet_service
+						elements = {}
+					}
+				}`,
+			listOutput: []*Element{},
+		},
+		{
+			name:       "no elements",
+			objectType: "set",
+			nftOutput:  `
+				table ip testing {
+					set test {
+						type ipv4_addr . inet_proto . inet_service
+						elements = {
+						}
+					}
+				}`,
+			listOutput: []*Element{},
+		},
+		{
+			name:       "one element",
+			objectType: "map",
+			nftOutput:  `
+				table ip testing {
+					map test {
+						type ipv4_addr . inet_proto . inet_service : verdict
+						elements = { 192.168.0.1 . tcp . 80 : goto chain1 }
+					}
+				}`,
+			listOutput: []*Element{
+				&Element{
+					Name:  "test",
+					Key:   "192.168.0.1 . tcp . 80",
+					Value: "goto chain1",
+				},
+			},
+		},
+		{
+			name:       "two elements",
+			objectType: "map",
+			nftOutput:  `
+				table ip testing {
+					map test {
+						type ipv4_addr . inet_proto . inet_service : verdict
+						elements = { 192.168.0.1 . tcp . 80 : goto chain1,
+						             192.168.0.2 . tcp . 443 comment "foo" : drop }
+					}
+				}`,
+			listOutput: []*Element{
+				&Element{
+					Name:  "test",
+					Key:   "192.168.0.1 . tcp . 80",
+					Value: "goto chain1",
+				},
+				&Element{
+					Name:    "test",
+					Key:     "192.168.0.2 . tcp . 443",
+					Comment: Optional("foo"),
+					Value:   "drop",
+				},
+			},
+		},
+		{
+			name:       "three elements",
+			objectType: "set",
+			nftOutput:  `
+				table ip testing {
+					set test {
+						type ipv4_addr . inet_proto . inet_service
+						elements = { 192.168.0.1 . tcp . 80,
+						             192.168.0.3 . udp . 80,
+						             192.168.0.2 . tcp . 443 comment "foo" }
+					}
+				}`,
+			listOutput: []*Element{
+				&Element{
+					Name: "test",
+					Key:  "192.168.0.1 . tcp . 80",
+				},
+				&Element{
+					Name: "test",
+					Key:  "192.168.0.3 . udp . 80",
+				},
+				&Element{
+					Name:    "test",
+					Key:     "192.168.0.2 . tcp . 443",
+					Comment: Optional("foo"),
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fexec := newFakeExec(t)
+			var err error
+			if tc.nftError != "" {
+				err = fmt.Errorf(tc.nftError)
+			}
+			fexec.expected = append(fexec.expected,
+				expectedCmd{
+					args:   []string{"nft", "list", tc.objectType, "ip", "testing", "test"},
+					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
+					err:    err,
+				},
+			)
+			nft := &realNFTables{
+				family: IPv4Family,
+				table:  "testing",
+				exec:   fexec,
+			}
+
+			result, err := nft.ListElements(context.Background(), tc.objectType, "test")
+			if err != nil {
+				if tc.nftError == "" {
+					t.Errorf("unexpected error: %v", err)
+				}
+				return
+			} else if tc.nftError != "" {
+				t.Errorf("unexpected non-error")
+				return
+			}
+
+			diff := cmp.Diff(tc.listOutput, result)
+			if diff != "" {
+				t.Errorf("unexpected result:\n%s", diff)
+			}
+		})
 	}
 }
