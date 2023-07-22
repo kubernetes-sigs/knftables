@@ -25,8 +25,9 @@ import (
 
 // Fake is a fake implementation of Interface
 type Fake struct {
-	family Family
-	table  string
+	family  Family
+	table   string
+	defines []define
 
 	nextHandle int
 
@@ -67,8 +68,9 @@ type FakeMap struct {
 // NewFake creates a new fake Interface, for unit tests
 func NewFake(family Family, table string) *Fake {
 	return &Fake{
-		family: family,
-		table:  table,
+		family:  family,
+		table:   table,
+		defines: defaultDefinesForFamily(family),
 	}
 }
 
@@ -139,8 +141,13 @@ func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]
 	return nil, fmt.Errorf("no such %s %q", objectType, name)
 }
 
-func substituteDefines(val string, tx *Transaction) string {
-	for _, def := range tx.defines {
+// Define is part of Interface
+func (fake *Fake) Define(name, value string) {
+	fake.defines = append(fake.defines, define{name, value})
+}
+
+func substituteDefines(val string, defines []define) string {
+	for _, def := range defines {
 		val = strings.ReplaceAll(val, "$"+def.name, def.value)
 	}
 	return val
@@ -218,7 +225,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			switch op.verb {
 			case addVerb:
 				rule := *obj
-				rule.Rule = substituteDefines(rule.Rule, tx)
+				rule.Rule = substituteDefines(rule.Rule, fake.defines)
 				rule.Handle = Optional(fake.nextHandle)
 				existingChain.Rules = append(existingChain.Rules, &rule)
 			case deleteVerb:
@@ -241,8 +248,8 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				set := *obj
-				set.Type = substituteDefines(set.Type, tx)
-				set.TypeOf = substituteDefines(set.TypeOf, tx)
+				set.Type = substituteDefines(set.Type, fake.defines)
+				set.TypeOf = substituteDefines(set.TypeOf, fake.defines)
 				set.Handle = Optional(fake.nextHandle)
 				fake.Table.Sets[obj.Name] = &FakeSet{
 					Set: set,
@@ -266,8 +273,8 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				mapObj := *obj
-				mapObj.Type = substituteDefines(mapObj.Type, tx)
-				mapObj.TypeOf = substituteDefines(mapObj.TypeOf, tx)
+				mapObj.Type = substituteDefines(mapObj.Type, fake.defines)
+				mapObj.TypeOf = substituteDefines(mapObj.TypeOf, fake.defines)
 				mapObj.Handle = Optional(fake.nextHandle)
 				fake.Table.Maps[obj.Name] = &FakeMap{
 					Map: mapObj,
@@ -289,14 +296,14 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				switch op.verb {
 				case addVerb:
 					element := *obj
-					element.Key = substituteDefines(element.Key, tx)
+					element.Key = substituteDefines(element.Key, fake.defines)
 					if i := findElement(existingSet.Elements, element.Key); i != -1 {
 						existingSet.Elements[i] = &element
 					} else {
 						existingSet.Elements = append(existingSet.Elements, &element)
 					}
 				case deleteVerb:
-					key := substituteDefines(obj.Key, tx)
+					key := substituteDefines(obj.Key, fake.defines)
 					if i := findElement(existingSet.Elements, obj.Key); i != -1 {
 						existingSet.Elements = append(existingSet.Elements[:i], existingSet.Elements[i+1:]...)
 					} else {
@@ -313,15 +320,15 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				switch op.verb {
 				case addVerb:
 					element := *obj
-					element.Key = substituteDefines(element.Key, tx)
-					element.Value = substituteDefines(element.Value, tx)
+					element.Key = substituteDefines(element.Key, fake.defines)
+					element.Value = substituteDefines(element.Value, fake.defines)
 					if i := findElement(existingMap.Elements, element.Key); i != -1 {
 						existingMap.Elements[i] = &element
 					} else {
 						existingMap.Elements = append(existingMap.Elements, &element)
 					}
 				case deleteVerb:
-					key := substituteDefines(obj.Key, tx)
+					key := substituteDefines(obj.Key, fake.defines)
 					if i := findElement(existingMap.Elements, obj.Key); i != -1 {
 						existingMap.Elements = append(existingMap.Elements[:i], existingMap.Elements[i+1:]...)
 					} else {

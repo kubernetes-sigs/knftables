@@ -24,17 +24,8 @@ import (
 
 // Transaction represents an nftables transaction
 type Transaction struct {
-	defines []define
-
 	operations []operation
 	err        error
-}
-
-// define stores an nftables define. (We have to use `[]define` rather than
-// `map[string]string` because order is important.)
-type define struct {
-	name  string
-	value string
 }
 
 // operation contains a single nftables operation (eg "add table", "flush chain")
@@ -55,15 +46,9 @@ const (
 	flushVerb   verb = "flush"
 )
 
-// NewTransaction creates a new transaction acting on the given family and table.
+// NewTransaction creates a new transaction.
 func NewTransaction() *Transaction {
 	return &Transaction{}
-}
-
-// Define adds a define ("nft -D") to tx, which can then be referenced as `$name` in the
-// transaction body (e.g., rules, elements, etc; any string-valued Object field).
-func (tx *Transaction) Define(name, value string) {
-	tx.defines = append(tx.defines, define{name, value})
 }
 
 // asCommandBuf returns the transaction as an io.Reader that outputs a series of nft commands
@@ -73,12 +58,6 @@ func (tx *Transaction) asCommandBuf(family Family, table string) (io.Reader, err
 	}
 
 	buf := &bytes.Buffer{}
-	for _, def := range tx.defines {
-		_, err := fmt.Fprintf(buf, "define %s = %s\n", def.name, def.value)
-		if err != nil {
-			return nil, err
-		}
-	}
 	for _, op := range tx.operations {
 		op.obj.writeOperation(op.verb, family, table, buf)
 	}

@@ -31,6 +31,15 @@ type Interface interface {
 	// Present determines if nftables is present/usable on the system.
 	Present() error
 
+	// Define adds a define (as with "nft -D") to the Interface, which can then be
+	// referenced as `$name` in transaction bodies (e.g., rules, elements, etc; any
+	// string-valued Object field).
+	//
+	// If the Interface's family is `IPv4Family` or `IPv6Family`, then two defines
+	// will automatically be added: "IP", defined to either "ip" or "ip6", and
+	// "INET_ADDR", defined to either "ipv4_addr" or "ipv6_addr".
+	Define(name, value string)
+
 	// Run runs a Transaction and returns the result.
 	Run(ctx context.Context, tx *Transaction) error
 
@@ -46,21 +55,47 @@ type Interface interface {
 	ListElements(ctx context.Context, objectType, name string) ([]*Element, error)
 }
 
+// define stores an nftables define. (We have to use `[]define` rather than
+// `map[string]string` because order is important.)
+type define struct {
+	name  string
+	value string
+}
+
+func defaultDefinesForFamily(family Family) []define {
+	switch family {
+	case IPv4Family:
+		return []define{{"IP", "ip"}, {"INET_ADDR", "ipv4_addr"}}
+	case IPv6Family:
+		return []define{{"IP", "ip6"}, {"INET_ADDR", "ipv6_addr"}}
+	default:
+		return []define{}
+	}
+}
+
 // realNFTables is an implementation of Interface
 type realNFTables struct {
-	family Family
-	table  string
+	family  Family
+	table   string
+	defines []define
 
 	exec execer
 }
 
-func New(family Family, table string) Interface {
+// for unit tests
+func newInternal(family Family, table string, exec execer) Interface {
 	return &realNFTables{
-		family: family,
-		table:  table,
+		family:  family,
+		table:   table,
+		defines: defaultDefinesForFamily(family),
 
-		exec: realExec{},
+		exec: exec,
 	}
+}
+
+// New creates a new nftables.Interface for interacting with the given table.
+func New(family Family, table string) Interface {
+	return newInternal(family, table, realExec{})
 }
 
 // Present is part of Interface.
@@ -74,6 +109,11 @@ func (nft *realNFTables) Present() error {
 	return err
 }
 
+// Define is part of Interface
+func (nft *realNFTables) Define(name, value string) {
+	nft.defines = append(nft.defines, define{name, value})
+}
+
 // Run is part of Interface
 func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 	if tx.err != nil {
@@ -85,7 +125,13 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, "nft", "-f", "-")
+	args := make([]string, 0, 2*len(nft.defines) + 2)
+	for _, def := range nft.defines {
+		args = append(args, "-D", fmt.Sprintf("%s=%s", def.name, def.value))
+	}
+	args = append(args, "-f", "-")
+
+	cmd := exec.CommandContext(ctx, "nft", args...)
 	cmd.Stdin = buf
 	_, err = nft.exec.Run(cmd)
 	return err

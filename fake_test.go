@@ -31,8 +31,6 @@ func TestFakeRun(t *testing.T) {
 	fake := NewFake(IPv4Family, "kube-proxy")
 	tx := NewTransaction()
 
-	tx.Define("IP", "ip")
-
 	tx.Add(&Table{})
 	tx.Add(&Chain{
 		Name:    "chain",

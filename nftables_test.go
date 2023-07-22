@@ -95,11 +95,7 @@ func TestListBad(t *testing.T) {
 					err:    nftErr,
 				},
 			)
-			nft := &realNFTables{
-				family: IPv4Family,
-				table:  "testing",
-				exec:   fexec,
-			}
+			nft := newInternal(IPv4Family, "testing", fexec)
 
 			result, err := nft.List(context.Background(), "chains")
 			if result != nil {
@@ -146,11 +142,7 @@ func TestList(t *testing.T) {
 					stdout: tc.nftOutput,
 				},
 			)
-			nft := &realNFTables{
-				family: IPv4Family,
-				table:  "testing",
-				exec:   fexec,
-			}
+			nft := newInternal(IPv4Family, "testing", fexec)
 
 			result, err := nft.List(context.Background(), tc.objType)
 			if err != nil {
@@ -165,14 +157,8 @@ func TestList(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	fexec := newFakeExec(t)
-	nft := &realNFTables{
-		family: IPv4Family,
-		table:  "kube-proxy",
-		exec:   fexec,
-	}
-
+	nft := newInternal(IPv4Family, "kube-proxy", fexec)
 	tx := NewTransaction()
-	tx.Define("IP", "ip")
 
 	tx.Add(&Table{})
 	tx.Add(&Chain{
@@ -185,14 +171,13 @@ func TestRun(t *testing.T) {
 	})
 
 	expected := strings.TrimPrefix(dedent.Dedent(`
-		define IP = ip
 		add table ip kube-proxy
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain $IP daddr 10.0.0.0/8 drop
 		`), "\n")
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
-			args:  []string{"nft", "-f", "-"},
+			args:  []string{"nft", "-D", "IP=ip", "-D", "INET_ADDR=ipv4_addr", "-f", "-"},
 			stdin: expected,
 		},
 	)
@@ -455,11 +440,7 @@ func TestListRules(t *testing.T) {
 					err:    err,
 				},
 			)
-			nft := &realNFTables{
-				family: IPv4Family,
-				table:  "testing",
-				exec:   fexec,
-			}
+			nft := newInternal(IPv4Family, "testing", fexec)
 
 			result, err := nft.ListRules(context.Background(), "testchain")
 			if err != nil {
@@ -609,11 +590,7 @@ func TestListElements(t *testing.T) {
 					err:    err,
 				},
 			)
-			nft := &realNFTables{
-				family: IPv4Family,
-				table:  "testing",
-				exec:   fexec,
-			}
+			nft := newInternal(IPv4Family, "testing", fexec)
 
 			result, err := nft.ListElements(context.Background(), tc.objectType, "test")
 			if err != nil {
