@@ -186,4 +186,11 @@ func TestFakeRun(t *testing.T) {
 	if dump != expected {
 		t.Errorf("unexpected Dump content after delete:\nexpected\n%s\n\ngot\n%s", expected, dump)
 	}
+
+	tx = NewTransaction()
+	tx.Delete(ruleToDelete)
+	err = fake.Run(context.Background(), tx)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
 }

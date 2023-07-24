@@ -55,7 +55,7 @@ func ParsePriority(family Family, priority string) (int, error) {
 		mod := priority[i:]
 		modVal, err = strconv.Atoi(mod)
 		if err != nil {
-			return 0, fmt.Errorf("could not parse modifier %q: %v", mod, err)
+			return 0, fmt.Errorf("could not parse modifier %q: %w", mod, err)
 		}
 		priority = priority[:i]
 	}

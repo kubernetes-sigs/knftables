@@ -164,7 +164,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 	for _, op := range tx.operations {
 		if fake.Table == nil {
 			if _, ok := op.obj.(*Table); !ok || op.verb != addVerb {
-				return fmt.Errorf("no such table \"%s %s\"", fake.family, fake.table)
+				return notFoundError("no such table \"%s %s\"", fake.family, fake.table)
 			}
 		}
 
@@ -197,7 +197,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		case *Chain:
 			existingChain := fake.Table.Chains[obj.Name]
 			if existingChain == nil && op.verb != addVerb {
-				return fmt.Errorf("no such chain %q", obj.Name)
+				return notFoundError("no such chain %q", obj.Name)
 			}
 			switch op.verb {
 			case addVerb:
@@ -220,7 +220,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		case *Rule:
 			existingChain := fake.Table.Chains[obj.Chain]
 			if existingChain == nil {
-				return fmt.Errorf("no such chain %q", obj.Chain)
+				return notFoundError("no such chain %q", obj.Chain)
 			}
 			switch op.verb {
 			case addVerb:
@@ -232,7 +232,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				if i := findRule(existingChain.Rules, *obj.Handle); i != -1 {
 					existingChain.Rules = append(existingChain.Rules[:i], existingChain.Rules[i+1:]...)
 				} else {
-					return fmt.Errorf("no rule with handle %d", *obj.Handle)
+					return notFoundError("no rule with handle %d", *obj.Handle)
 				}
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
@@ -240,7 +240,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		case *Set:
 			existingSet := fake.Table.Sets[obj.Name]
 			if existingSet == nil && op.verb != addVerb {
-				return fmt.Errorf("no such set %q", obj.Name)
+				return notFoundError("no such set %q", obj.Name)
 			}
 			switch op.verb {
 			case addVerb:
@@ -265,7 +265,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		case *Map:
 			existingMap := fake.Table.Maps[obj.Name]
 			if existingMap == nil && op.verb != addVerb {
-				return fmt.Errorf("no such map %q", obj.Name)
+				return notFoundError("no such map %q", obj.Name)
 			}
 			switch op.verb {
 			case addVerb:
@@ -291,7 +291,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			if len(obj.Value) == 0 {
 				existingSet := fake.Table.Sets[obj.Name]
 				if existingSet == nil {
-					return fmt.Errorf("no such set %q", obj.Name)
+					return notFoundError("no such set %q", obj.Name)
 				}
 				switch op.verb {
 				case addVerb:
@@ -307,7 +307,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					if i := findElement(existingSet.Elements, obj.Key); i != -1 {
 						existingSet.Elements = append(existingSet.Elements[:i], existingSet.Elements[i+1:]...)
 					} else {
-						return fmt.Errorf("no such element %q", key)
+						return notFoundError("no such element %q", key)
 					}
 				default:
 					return fmt.Errorf("unhandled operation %q", op.verb)
@@ -315,7 +315,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			} else {
 				existingMap := fake.Table.Maps[obj.Name]
 				if existingMap == nil {
-					return fmt.Errorf("no such map %q", obj.Name)
+					return notFoundError("no such map %q", obj.Name)
 				}
 				switch op.verb {
 				case addVerb:
@@ -332,7 +332,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					if i := findElement(existingMap.Elements, obj.Key); i != -1 {
 						existingMap.Elements = append(existingMap.Elements[:i], existingMap.Elements[i+1:]...)
 					} else {
-						return fmt.Errorf("no such element %q", key)
+						return notFoundError("no such element %q", key)
 					}
 				default:
 					return fmt.Errorf("unhandled operation %q", op.verb)

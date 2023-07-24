@@ -44,17 +44,11 @@ func (_ realExec) LookPath(file string) (string, error) {
 
 // Run is part of execer
 func (_ realExec) Run(cmd *exec.Cmd) (string, error) {
-	outBytes, err := cmd.Output()
-	out := string(outBytes)
-	if err == nil {
-		return out, nil
+	out, err := cmd.Output()
+	if err != nil {
+		err = wrapError(err)
 	}
-	if ee, ok := err.(*exec.ExitError); ok {
-		if len(ee.Stderr) > 0 {
-			return out, fmt.Errorf("%s", string(ee.Stderr))
-		}
-	}
-	return out, err
+	return string(out), err
 }
 
 // fakeExec is a mockable implementation of execer for unit tests

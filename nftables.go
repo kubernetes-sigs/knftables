@@ -40,18 +40,22 @@ type Interface interface {
 	// "INET_ADDR", defined to either "ipv4_addr" or "ipv6_addr".
 	Define(name, value string)
 
-	// Run runs a Transaction and returns the result.
+	// Run runs a Transaction and returns the result. The IsNotFound and
+	// IsAlreadyExists methods can be used to test the result.
 	Run(ctx context.Context, tx *Transaction) error
 
 	// List returns a list of the names of the objects of objectType ("chain", "set",
-	// or "map") in the table.
+	// or "map") in the table. If there are no such objects, this will return an empty
+	// list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
-	// ListRules returns a list of the rules in a chain.
+	// ListRules returns a list of the rules in a chain. If the chain exists but
+	// contains no rules, this will return an empty list and no error.
 	ListRules(ctx context.Context, chain string) ([]*Rule, error)
 
-	// ListElements returns a list of the elements in a set or map. (objectType
-	// should be "set" or "map".)
+	// ListElements returns a list of the elements in a set or map. (objectType should
+	// be "set" or "map".) If the set/map exists but contains no elements, this will
+	// return an empty list and no error.
 	ListElements(ctx context.Context, objectType, name string) ([]*Element, error)
 }
 
@@ -101,7 +105,7 @@ func New(family Family, table string) Interface {
 // Present is part of Interface.
 func (nft *realNFTables) Present() error {
 	if _, err := nft.exec.LookPath("nft"); err != nil {
-		return fmt.Errorf("could not run nftables binary: %v", err)
+		return fmt.Errorf("could not run nftables binary: %w", err)
 	}
 
 	cmd := exec.Command("nft", "--check", "add", "table", string(nft.family), nft.table)
@@ -163,7 +167,7 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 	cmd := exec.CommandContext(ctx, "nft", "--json", "list", typePlural, string(nft.family))
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run nft: %v", err)
+		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
 	// out contains JSON looking like:
@@ -189,7 +193,7 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 	jsonResult := map[string][]map[string]map[string]interface{}{}
 	if err := json.Unmarshal([]byte(out), &jsonResult); err != nil {
-		return nil, fmt.Errorf("could not parse nft output: %v", err)
+		return nil, fmt.Errorf("could not parse nft output: %w", err)
 	}
 
 	nftablesResult := jsonResult["nftables"]
@@ -230,7 +234,7 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 	cmd := exec.CommandContext(ctx, "nft", "--handle", "list", "chain", string(nft.family), nft.table, chain)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run nft: %v", err)
+		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
 	// Output looks like:
@@ -300,7 +304,7 @@ func (nft *realNFTables) ListElements(ctx context.Context, objectType, name stri
 	cmd := exec.CommandContext(ctx, "nft", "list", objectType, string(nft.family), nft.table, name)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run nft: %v", err)
+		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
 	// Output looks like:
