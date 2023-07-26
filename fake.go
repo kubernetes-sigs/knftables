@@ -31,7 +31,8 @@ type Fake struct {
 
 	nextHandle int
 
-	// Table contains the Interface's table, if it has been added
+	// Table contains the Interface's table. This will be `nil` until you `tx.Add()`
+	// the table.
 	Table *FakeTable
 }
 
@@ -39,15 +40,21 @@ type Fake struct {
 type FakeTable struct {
 	Table
 
+	// Chains contains the table's chains, keyed by name
 	Chains map[string]*FakeChain
-	Sets   map[string]*FakeSet
-	Maps   map[string]*FakeMap
+
+	// Sets contains the table's sets, keyed by name
+	Sets map[string]*FakeSet
+
+	// Maps contains the table's maps, keyed by name
+	Maps map[string]*FakeMap
 }
 
 // FakeChain wraps Chain for the Fake implementation
 type FakeChain struct {
 	Chain
 
+	// Rules contains the chain's rules, in order
 	Rules []*Rule
 }
 
@@ -55,6 +62,8 @@ type FakeChain struct {
 type FakeSet struct {
 	Set
 
+	// Elements contains the set's elements. You can also use the FakeSet's
+	// FindElement() method to see if a particular element is present.
 	Elements []*Element
 }
 
@@ -62,6 +71,8 @@ type FakeSet struct {
 type FakeMap struct {
 	Map
 
+	// Elements contains the map's elements. You can also use the FakeMap's
+	// FindElement() method to see if a particular element is present.
 	Elements []*Element
 }
 
@@ -419,6 +430,8 @@ func findElement(elements []*Element, key string) int {
 	return -1
 }
 
+// FindElement finds an element of the set with the given key. If there is no matching
+// element, it returns nil.
 func (s *FakeSet) FindElement(key ...string) *Element {
 	index := findElement(s.Elements, Join(key...))
 	if index == -1 {
@@ -427,6 +440,8 @@ func (s *FakeSet) FindElement(key ...string) *Element {
 	return s.Elements[index]
 }
 
+// FindElement finds an element of the map with the given key. If there is no matching
+// element, it returns nil.
 func (m *FakeMap) FindElement(key ...string) *Element {
 	index := findElement(m.Elements, Join(key...))
 	if index == -1 {

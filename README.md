@@ -25,12 +25,30 @@ if err := nft.Present(); err != nil {
 }
 ```
 
-Use the `List` method on the `Interface` to check if objects exist:
+The `Define` method can be used to add defines (as with `nft -D
+name=value`) to an `Interface` which can then be referenced with
+`$name` in transactions. If you are using `IPv4Family` or `IPv6Family`
+then you automatically get the defines `IP` (`"ip"` or `"ip6"`) and
+`INET_ADDR` (`"ipv4_addr"` or `"ipv6_addr"`) which can be used to
+allow the same rules and set/map definitions to be used for IPv4 and
+IPv6.
+
+You can use the `List`, `ListRules`, and `ListElements` methods on the
+`Interface` to check if objects exist. `List` returns the names of
+`"chains"`, `"sets"`, or `"maps"` in the table, while `ListRules` and
+`ListElements` return `Rule` and `Element` objects.
 
 ```golang
 chains, err := nft.List(ctx, "chains")
 if err != nil {
         return fmt.Errorf("could not list chains: %v", err)
+}
+
+FIXME
+
+elements, err := nft.ListElements(ctx, "map", "mymap")
+if err != nil {
+        return fmt.Errorf("could not list map elements: %v", err)
 }
 
 FIXME
@@ -51,10 +69,18 @@ tx.Flush(&nftables.Chain{
 })
 
 tx.AddRule("mychain",
-        "ip daddr", destIP,
+        "$IP daddr", destIP,
         "jump", destChain,
 )
+
+err := nft.Run(context, tx)
 ```
+
+If any operation in the transaction would fail, then `Run()` will
+return an error and the entire transaction will be ignored. You can
+use the `nftables.IsNotFound()` and `nft.IsAlreadyExists()` methods to
+check for those well-known error types. In a large transaction, there
+is no supported way to determine exactly which operation failed.
 
 ## `nftables.Transaction` operations
 
@@ -82,11 +108,6 @@ The currently-supported objects are:
 - `Map`
 - `Element`
 
-`Table` has a `Name` field of type `*TableName` and every other object
-has a `Table` field of type `*TableName`, for specifying the family
-and table name, but you do not normally need to fill these in, because
-they get filled in automatically with the values from the `Interface`.
-
 Optional fields in objects can be filled in with the help of the
 `Optional()` function, which just returns a pointer to its
 argument.
@@ -95,42 +116,46 @@ The `Join()` and `Split()` helper functions can be used with set and
 map keys and values, to convert between multiple values specified
 separately, and a single string with the values separated by dots.
 
+## `nftables.Fake`
+
+There is a fake (in-memory) implementation of `nftables.Interface` for
+use in unit tests. Use `nftables.NewFake()` instead of
+`nftables.New()` to create it, and then it should work mostly the
+same. See `fake.go` for more details of the public APIs for examining
+the current state of the fake nftables database.
+
+Note that at the present time, `fake.Run()` is not actually
+transactional, so unit tests that rely on things not being changed if
+a transaction fails partway through will not work as expected.
+
 ## Missing APIs
 
 Various top-level object types are not yet supported (notably the
 "stateful objects" like `counter`).
 
-There needs to be a way to list the elements of a set/map, and/or to
-check whether a set/map contains a particular element.
+Most IPTables libraries have an API for "add this rule only if it
+doesn't already exist", but that does not seem as useful in nftables
+(or at least "in nftables as used by Kubernetes-ish components that
+aren't just blindly copying over old iptables APIs"), because chains
+tend to have static rules and dynamic sets/maps, rather than having
+dynamic rules. If you aren't sure if a chain has the correct rules,
+you can just `Flush` it and recreate all of the rules.
 
-Most IPTables libraries would likewise have APIs to list the rules in
-a chain / check whether a chain contains a rule / add a rule to a
-chain only if it's not already there. But that does not seem as useful
-in nftables (or at least "in nftables as used by Kubernetes-ish
-components that aren't just blindly copying over old iptables APIs")
-because chains tend to have static rules and dynamic sets/maps, rather
-than having dynamic rules. If you aren't sure if a chain has the
-correct rules, you can just `Flush` it and recreate all of the rules.
+I've considered changing the semantics of `tx.Add(obj)` so that
+`obj.Handle` is filled in with the new object's handle on return from
+`Run()`, for ease of deleting later. (This would be implemented by
+using the `--handle` (`-a`) and `--echo` (`-e`) flags to `nft add`.)
+However, this would require potentially difficult parsing of the `nft`
+output. `ListRules` fills in the handles of the rules it returns, so
+it's possible to find out a rule's handle after the fact that way. For
+other supported object types, either handles don't exist (`Element`)
+or you don't really need to know their handles because it's possible
+to delete by name instead (`Table`, `Chain`, `Set`, `Map`).
 
-Although the API supports `tx.Delete(&nftables.Rule{...})`, it's not
-actually possible to use it (without getting information from outside
-sources), because you need to know the `Handle` of the rule in order
-to delete it, but we provide no way to find that out. In theory if we
-had a "list rule(s)" operation you could use that to find it, or if we
-used the `--handle` (`-a`) and `--echo` (`-e`) flags to `nft` when
-doing an `add rule`, we could learn the handle then, and return that
-to the caller as part of running the transaction.
-
-But again, in my experience chains tend to have static rules, so you
-don't normally want to do `tx.Delete(&nftables.Rule{...})` anyway.
-(You _do_ need to be able to delete individual set/map elements, but
-you don't need to use handles for that; deleting a set/map element
-uses the same syntax as adding one.)
-
-Likewise, we don't currently support the `insert rule` and `replace
-rule` commands. Syntactically, this would be easy, but semantically it
-would be awkward for the same reason as rule deletion is (needing to
-know handles), and it is likewise of uncertain usefulness.
+The "destroy" (delete-without-ENOENT) command that exists in newer
+versions of `nft` is not currently supported because it would be
+unexpectedly heavyweight to emulate on systems that don't have it, so
+it is better (for now) to force callers to implement it by hand.
 
 # Design Notes
 
@@ -149,9 +174,11 @@ the JSON syntax for the rules you wanted so you could then write it in
 the form the library needed.)
 
 Using the non-JSON syntax has its own problems, and means that it is
-basically impossible for us to reliably parse rules, which means that
-the missing "does chain X contain rule Y?" and "what is the handle for
-rule Z?" APIs mentioned above are likely to stay missing.
+basically impossible for us to reliably parse the actual "rule" part
+of rules. (We can reliably parse the output of `"nft list chain"` into
+`Rule` objects, including distinguishing any `comment` from the rule
+itself, but we don't have any ability to split the rule up into
+individual clauses.)
 
 The fact that the API uses functions and objects (e.g.
 `tx.Add(&nftables.Chain{...})`) rather than just specifying everything
