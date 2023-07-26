@@ -54,10 +54,6 @@ func (table *Table) writeOperation(verb verb, family Family, tableName string, w
 
 // Object implementation for Chain
 func (chain *Chain) validate(verb verb) error {
-	if chain.Name == "" {
-		return fmt.Errorf("no name specified for chain")
-	}
-
 	if chain.Hook == nil && (chain.Type != nil || chain.Priority != nil) {
 		return fmt.Errorf("regular chain %q must not specify Type or Priority", chain.Name)
 	} else if chain.Hook != nil && (chain.Type == nil || chain.Priority == nil) {
@@ -66,11 +62,16 @@ func (chain *Chain) validate(verb verb) error {
 
 	switch verb {
 	case addVerb, flushVerb:
+		if chain.Name == "" {
+			return fmt.Errorf("no name specified for chain")
+		}
 		if chain.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
 	case deleteVerb:
-		// Handle can be nil or non-nil
+		if chain.Name == "" && chain.Handle == nil {
+			return fmt.Errorf("must specify either name or handle")
+		}
 	default:
 		return fmt.Errorf("%s is not implemented for chains", verb)
 	}
@@ -112,8 +113,24 @@ func (rule *Rule) validate(verb verb) error {
 		return fmt.Errorf("cannot specify both Index and Handle")
 	}
 
-	if (verb == deleteVerb || verb == replaceVerb) && rule.Handle == nil {
-		return fmt.Errorf("must specify Handle with %s", verb)
+	switch verb {
+	case addVerb, insertVerb:
+		if rule.Rule == "" {
+			return fmt.Errorf("no rule specified")
+		}
+	case replaceVerb:
+		if rule.Rule == "" {
+			return fmt.Errorf("no rule specified")
+		}
+		if rule.Handle == nil {
+			return fmt.Errorf("must specify Handle with %s", verb)
+		}
+	case deleteVerb:
+		if rule.Handle == nil {
+			return fmt.Errorf("must specify Handle with %s", verb)
+		}
+	default:
+		return fmt.Errorf("%s is not implemented for rules", verb)
 	}
 
 	return nil
@@ -141,22 +158,23 @@ func (rule *Rule) writeOperation(verb verb, family Family, table string, writer 
 
 // Object implementation for Set
 func (set *Set) validate(verb verb) error {
-	if set.Name == "" {
-		return fmt.Errorf("no name specified for set")
-	}
-
 	switch verb {
 	case addVerb:
 		if (set.Type == "" && set.TypeOf == "") || (set.Type != "" && set.TypeOf != "") {
 			return fmt.Errorf("set must specify either Type or TypeOf")
 		}
-		fallthrough
-	case flushVerb:
 		if set.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
+		fallthrough
+	case flushVerb:
+		if set.Name == "" {
+			return fmt.Errorf("no name specified for set")
+		}
 	case deleteVerb:
-		// Handle can be nil or non-nil
+		if set.Name == "" && set.Handle == nil {
+			return fmt.Errorf("must specify either name or handle")
+		}
 	default:
 		return fmt.Errorf("%s is not implemented for sets", verb)
 	}
@@ -220,22 +238,23 @@ func (set *Set) writeOperation(verb verb, family Family, table string, writer io
 
 // Object implementation for Map
 func (mapObj *Map) validate(verb verb) error {
-	if mapObj.Name == "" {
-		return fmt.Errorf("no name specified for map")
-	}
-
 	switch verb {
 	case addVerb:
 		if (mapObj.Type == "" && mapObj.TypeOf == "") || (mapObj.Type != "" && mapObj.TypeOf != "") {
 			return fmt.Errorf("map must specify either Type or TypeOf")
 		}
-		fallthrough
-	case flushVerb:
 		if mapObj.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
+		fallthrough
+	case flushVerb:
+		if mapObj.Name == "" {
+			return fmt.Errorf("no name specified for map")
+		}
 	case deleteVerb:
-		// Handle can be nil or non-nil
+		if mapObj.Name == "" && mapObj.Handle == nil {
+			return fmt.Errorf("must specify either name or handle")
+		}
 	default:
 		return fmt.Errorf("%s is not implemented for maps", verb)
 	}
@@ -298,6 +317,16 @@ func (mapObj *Map) writeOperation(verb verb, family Family, table string, writer
 func (element *Element) validate(verb verb) error {
 	if element.Name == "" {
 		return fmt.Errorf("no set/map name specified for element")
+	}
+
+	if element.Key == "" {
+		return fmt.Errorf("no key specified for element")
+	}
+
+	switch verb {
+	case addVerb, createVerb, deleteVerb:
+	default:
+		return fmt.Errorf("%s is not implemented for maps", verb)
 	}
 
 	return nil
