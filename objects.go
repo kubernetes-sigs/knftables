@@ -24,7 +24,7 @@ import (
 // Object implementation for Table
 func (table *Table) validate(verb verb) error {
 	switch verb {
-	case addVerb, flushVerb:
+	case addVerb, createVerb, flushVerb:
 		if table.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
@@ -46,7 +46,7 @@ func (table *Table) writeOperation(verb verb, family Family, tableName string, w
 
 	// All other cases refer to the table by name
 	fmt.Fprintf(writer, "%s table %s %s", verb, family, tableName)
-	if verb == addVerb && table.Comment != nil {
+	if (verb == addVerb || verb == createVerb) && table.Comment != nil {
 		fmt.Fprintf(writer, " { comment %q ; }", *table.Comment)
 	}
 	fmt.Fprintf(writer, "\n")
@@ -61,7 +61,7 @@ func (chain *Chain) validate(verb verb) error {
 	}
 
 	switch verb {
-	case addVerb, flushVerb:
+	case addVerb, createVerb, flushVerb:
 		if chain.Name == "" {
 			return fmt.Errorf("no name specified for chain")
 		}
@@ -87,7 +87,7 @@ func (chain *Chain) writeOperation(verb verb, family Family, table string, write
 	}
 
 	fmt.Fprintf(writer, "%s chain %s %s %s", verb, family, table, chain.Name)
-	if verb == addVerb && (chain.Type != nil || chain.Comment != nil) {
+	if (verb == addVerb || verb == createVerb) && (chain.Type != nil || chain.Comment != nil) {
 		fmt.Fprintf(writer, " {")
 
 		if chain.Type != nil {
@@ -159,7 +159,7 @@ func (rule *Rule) writeOperation(verb verb, family Family, table string, writer 
 // Object implementation for Set
 func (set *Set) validate(verb verb) error {
 	switch verb {
-	case addVerb:
+	case addVerb, createVerb:
 		if (set.Type == "" && set.TypeOf == "") || (set.Type != "" && set.TypeOf != "") {
 			return fmt.Errorf("set must specify either Type or TypeOf")
 		}
@@ -190,7 +190,7 @@ func (set *Set) writeOperation(verb verb, family Family, table string, writer io
 	}
 
 	fmt.Fprintf(writer, "%s set %s %s %s", verb, family, table, set.Name)
-	if verb == addVerb {
+	if verb == addVerb || verb == createVerb {
 		fmt.Fprintf(writer, " {")
 
 		if set.Type != "" {
@@ -239,7 +239,7 @@ func (set *Set) writeOperation(verb verb, family Family, table string, writer io
 // Object implementation for Map
 func (mapObj *Map) validate(verb verb) error {
 	switch verb {
-	case addVerb:
+	case addVerb, createVerb:
 		if (mapObj.Type == "" && mapObj.TypeOf == "") || (mapObj.Type != "" && mapObj.TypeOf != "") {
 			return fmt.Errorf("map must specify either Type or TypeOf")
 		}
@@ -270,7 +270,7 @@ func (mapObj *Map) writeOperation(verb verb, family Family, table string, writer
 	}
 
 	fmt.Fprintf(writer, "%s map %s %s %s", verb, family, table, mapObj.Name)
-	if verb == addVerb {
+	if verb == addVerb || verb == createVerb {
 		fmt.Fprintf(writer, " {")
 
 		if mapObj.Type != "" {
@@ -318,7 +318,6 @@ func (element *Element) validate(verb verb) error {
 	if element.Name == "" {
 		return fmt.Errorf("no set/map name specified for element")
 	}
-
 	if element.Key == "" {
 		return fmt.Errorf("no key specified for element")
 	}
@@ -326,7 +325,7 @@ func (element *Element) validate(verb verb) error {
 	switch verb {
 	case addVerb, createVerb, deleteVerb:
 	default:
-		return fmt.Errorf("%s is not implemented for maps", verb)
+		return fmt.Errorf("%s is not implemented for elements", verb)
 	}
 
 	return nil
@@ -339,7 +338,7 @@ func (element *Element) writeOperation(verb verb, family Family, table string, w
 		fmt.Fprintf(writer, " : %s", element.Value)
 	}
 
-	if verb == addVerb && element.Comment != nil {
+	if (verb == addVerb || verb == createVerb) && element.Comment != nil {
 		fmt.Fprintf(writer, " comment %q", *element.Comment)
 	}
 

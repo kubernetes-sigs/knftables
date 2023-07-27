@@ -87,7 +87,8 @@ is no supported way to determine exactly which operation failed.
 `nftables.Transaction` operations correspond to the top-level commands
 in the `nft` binary. Currently-supported operations are:
 
-- `tx.Add()`: adds an object, as with `nft add`
+- `tx.Add()`: adds an object, which may already exist, as with `nft add`
+- `tx.Create()`: creates an object, which must not already exist, as with `nft create`
 - `tx.Flush()`: flushes the contents of a table/chain/set/map, as with `nft flush`
 - `tx.Delete()`: deletes an object, as with `nft delete`
 

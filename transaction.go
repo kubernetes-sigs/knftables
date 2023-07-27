@@ -84,6 +84,14 @@ func (tx *Transaction) Add(obj Object) {
 	tx.operation(addVerb, obj)
 }
 
+// Create adds an "nft create" operation to tx, creating obj, which must not already
+// exist. The Create() call always succeeds, but if obj is invalid, already exists, or is
+// inconsistent with the existing nftables state, then an error will be returned when the
+// transaction is Run.
+func (tx *Transaction) Create(obj Object) {
+	tx.operation(createVerb, obj)
+}
+
 // Flush adds an "nft flush" operation to tx, clearing the contents of obj. The Flush()
 // call always succeeds, but if obj does not exist (or does not support flushing) then an
 // error will be returned when the transaction is Run.

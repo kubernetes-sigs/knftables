@@ -173,8 +173,9 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 	// FIXME: not actually transactional!
 
 	for _, op := range tx.operations {
+		// If the table hasn't been created, and this isn't a Table operation, then fail
 		if fake.Table == nil {
-			if _, ok := op.obj.(*Table); !ok || op.verb != addVerb {
+			if _, ok := op.obj.(*Table); !ok {
 				return notFoundError("no such table \"%s %s\"", fake.family, fake.table)
 			}
 		}
@@ -185,33 +186,40 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 
 		switch obj := op.obj.(type) {
 		case *Table:
+			err := checkExists(op.verb, "table", fake.table, fake.Table)
+			if err != nil {
+				return err
+			}
 			switch op.verb {
 			case flushVerb:
 				fake.Table = nil
 				fallthrough
-			case addVerb:
-				if fake.Table == nil {
-					table := *obj
-					table.Handle = Optional(fake.nextHandle)
-					fake.Table = &FakeTable{
-						Table:  table,
-						Chains: make(map[string]*FakeChain),
-						Sets:   make(map[string]*FakeSet),
-						Maps:   make(map[string]*FakeMap),
-					}
+			case addVerb, createVerb:
+				if fake.Table != nil {
+					continue
+				}
+				table := *obj
+				table.Handle = Optional(fake.nextHandle)
+				fake.Table = &FakeTable{
+					Table:  table,
+					Chains: make(map[string]*FakeChain),
+					Sets:   make(map[string]*FakeSet),
+					Maps:   make(map[string]*FakeMap),
 				}
 			case deleteVerb:
 				fake.Table = nil
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
+
 		case *Chain:
 			existingChain := fake.Table.Chains[obj.Name]
-			if existingChain == nil && op.verb != addVerb {
-				return notFoundError("no such chain %q", obj.Name)
+			err := checkExists(op.verb, "chain", obj.Name, existingChain)
+			if err != nil {
+				return err
 			}
 			switch op.verb {
-			case addVerb:
+			case addVerb, createVerb:
 				if existingChain != nil {
 					continue
 				}
@@ -228,6 +236,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
+
 		case *Rule:
 			existingChain := fake.Table.Chains[obj.Chain]
 			if existingChain == nil {
@@ -248,13 +257,15 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
+
 		case *Set:
 			existingSet := fake.Table.Sets[obj.Name]
-			if existingSet == nil && op.verb != addVerb {
-				return notFoundError("no such set %q", obj.Name)
+			err := checkExists(op.verb, "set", obj.Name, existingSet)
+			if err != nil {
+				return err
 			}
 			switch op.verb {
-			case addVerb:
+			case addVerb, createVerb:
 				if existingSet != nil {
 					continue
 				}
@@ -275,8 +286,9 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			}
 		case *Map:
 			existingMap := fake.Table.Maps[obj.Name]
-			if existingMap == nil && op.verb != addVerb {
-				return notFoundError("no such map %q", obj.Name)
+			err := checkExists(op.verb, "map", obj.Name, existingMap)
+			if err != nil {
+				return err
 			}
 			switch op.verb {
 			case addVerb:
@@ -305,10 +317,13 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					return notFoundError("no such set %q", obj.Name)
 				}
 				switch op.verb {
-				case addVerb:
+				case addVerb, createVerb:
 					element := *obj
 					element.Key = substituteDefines(element.Key, fake.defines)
 					if i := findElement(existingSet.Elements, element.Key); i != -1 {
+						if op.verb == createVerb {
+							return existsError("element %q already exists", element.Key)
+						}
 						existingSet.Elements[i] = &element
 					} else {
 						existingSet.Elements = append(existingSet.Elements, &element)
@@ -329,11 +344,14 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					return notFoundError("no such map %q", obj.Name)
 				}
 				switch op.verb {
-				case addVerb:
+				case addVerb, createVerb:
 					element := *obj
 					element.Key = substituteDefines(element.Key, fake.defines)
 					element.Value = substituteDefines(element.Value, fake.defines)
 					if i := findElement(existingMap.Elements, element.Key); i != -1 {
+						if op.verb == createVerb {
+							return existsError("element %q already exists", element.Key)
+						}
 						existingMap.Elements[i] = &element
 					} else {
 						existingMap.Elements = append(existingMap.Elements, &element)
@@ -354,6 +372,23 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		}
 	}
 
+	return nil
+}
+
+func checkExists(verb verb, objectType, name string, existing Object) error {
+	switch verb {
+	case addVerb:
+		// It's fine if the object either exists or doesn't
+		return nil
+	case createVerb:
+		if existing != nil {
+			return existsError("%s %q already exists", objectType, name)
+		}
+	default:
+		if existing == nil {
+			return notFoundError("no such %s %q", objectType, name)
+		}
+	}
 	return nil
 }
 

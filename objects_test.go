@@ -40,6 +40,11 @@ func Test_validate(t *testing.T) {
 			object: &Table{Comment: Optional("foo")},
 		},
 		{
+			name:   "create table",
+			verb:   createVerb,
+			object: &Table{},
+		},
+		{
 			name:   "flush table",
 			verb:   flushVerb,
 			object: &Table{},
@@ -55,7 +60,7 @@ func Test_validate(t *testing.T) {
 			object: &Table{Handle: Optional(5)},
 		},
 		{
-			name:   "invalid add table",
+			name:   "invalid add table with Handle",
 			verb:   addVerb,
 			object: &Table{Handle: Optional(5)},
 			err:    "cannot specify Handle",
@@ -81,6 +86,11 @@ func Test_validate(t *testing.T) {
 			name:   "add base chain with comment",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority), Comment: Optional("foo")},
+		},
+		{
+			name:   "create chain",
+			verb:   createVerb,
+			object: &Chain{Name: "mychain"},
 		},
 		{
 			name:   "flush chain",
@@ -198,6 +208,12 @@ func Test_validate(t *testing.T) {
 			object: &Rule{Chain: "mychain", Handle: Optional(2)},
 		},
 		{
+			name:   "invalid create rule",
+			verb:   createVerb,
+			object: &Rule{Chain: "mychain", Rule: "drop"},
+			err:    "not implemented",
+		},
+		{
 			name:   "invalid flush rule",
 			verb:   flushVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop"},
@@ -244,6 +260,11 @@ func Test_validate(t *testing.T) {
 			name:   "add set with TypeOf",
 			verb:   addVerb,
 			object: &Set{Name: "myset", TypeOf: "ip addr"},
+		},
+		{
+			name:   "create set",
+			verb:   createVerb,
+			object: &Set{Name: "myset", Type: "ipv4_addr"},
 		},
 		{
 			name:   "flush set",
@@ -307,6 +328,11 @@ func Test_validate(t *testing.T) {
 			object: &Map{Name: "mymap", TypeOf: "ip addr : ip addr"},
 		},
 		{
+			name:   "create map",
+			verb:   createVerb,
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+		},
+		{
 			name:   "flush map",
 			verb:   flushVerb,
 			object: &Map{Name: "mymap"},
@@ -366,6 +392,11 @@ func Test_validate(t *testing.T) {
 			name:   "add (map) element",
 			verb:   addVerb,
 			object: &Element{Name: "mymap", Key: "10.0.0.1", Value: "192.168.1.1"},
+		},
+		{
+			name:   "create (set) element with comment",
+			verb:   createVerb,
+			object: &Element{Name: "myset", Key: "10.0.0.1", Comment: Optional("comment")},
 		},
 		{
 			name:   "delete (set) element",
