@@ -17,11 +17,20 @@ limitations under the License.
 package nftables
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
 
+func getObjType(object Object) string {
+	fullType := fmt.Sprintf("%T", object)
+	parts := strings.Split(fullType, ".")
+	return parts[len(parts)-1]
+}
+
 func Test_validate(t *testing.T) {
+	tested := make(map[string]map[verb]struct{})
+
 	for _, tc := range []struct {
 		name   string
 		verb   verb
@@ -509,7 +518,21 @@ func Test_validate(t *testing.T) {
 			} else if !strings.Contains(err.Error(), tc.err) {
 				t.Errorf("expected error with %q but got %q", tc.err, err)
 			}
+
+			objType := getObjType(tc.object)
+			if tested[objType] == nil {
+				tested[objType] = make(map[verb]struct{})
+			}
+			tested[objType][tc.verb] = struct{}{}
 		})
+	}
+
+	// add, create, flush, insert, replace, delete
+	numVerbs := 6
+	for objType, verbs := range tested {
+		if len(verbs) != numVerbs {
+			t.Errorf("expected to test %d verbs for %s, got %d (%v)", numVerbs, objType, len(verbs), verbs)
+		}
 	}
 }
 
