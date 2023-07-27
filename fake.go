@@ -180,7 +180,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			}
 		}
 
-		if op.verb == addVerb || op.verb == createVerb {
+		if op.verb == addVerb || op.verb == createVerb || op.verb == insertVerb {
 			fake.nextHandle++
 		}
 
@@ -242,18 +242,47 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			if existingChain == nil {
 				return notFoundError("no such chain %q", obj.Chain)
 			}
-			switch op.verb {
-			case addVerb:
-				rule := *obj
-				rule.Rule = substituteDefines(rule.Rule, fake.defines)
-				rule.Handle = Optional(fake.nextHandle)
-				existingChain.Rules = append(existingChain.Rules, &rule)
-			case deleteVerb:
-				if i := findRule(existingChain.Rules, *obj.Handle); i != -1 {
-					existingChain.Rules = append(existingChain.Rules[:i], existingChain.Rules[i+1:]...)
-				} else {
+			if op.verb == deleteVerb {
+				i := findRule(existingChain.Rules, *obj.Handle)
+				if i == -1 {
 					return notFoundError("no rule with handle %d", *obj.Handle)
 				}
+				existingChain.Rules = append(existingChain.Rules[:i], existingChain.Rules[i+1:]...)
+				continue
+			}
+
+			rule := *obj
+			rule.Rule = substituteDefines(rule.Rule, fake.defines)
+			refRule := -1
+			if rule.Handle != nil {
+				refRule = findRule(existingChain.Rules, *obj.Handle)
+				if refRule == -1 {
+					return notFoundError("no rule with handle %d", *obj.Handle)
+				}
+			} else if obj.Index != nil {
+				if *obj.Index >= len(existingChain.Rules) {
+					return notFoundError("no rule with index %d", *obj.Index)
+				}
+				refRule = *obj.Index
+			}
+
+			switch op.verb {
+			case addVerb:
+				if refRule == -1 {
+					existingChain.Rules = append(existingChain.Rules, &rule)
+				} else {
+					existingChain.Rules = append(existingChain.Rules[:refRule+1], append([]*Rule{&rule}, existingChain.Rules[refRule+1:]...)...)
+				}
+				rule.Handle = Optional(fake.nextHandle)
+			case insertVerb:
+				if refRule == -1 {
+					existingChain.Rules = append([]*Rule{&rule}, existingChain.Rules...)
+				} else {
+					existingChain.Rules = append(existingChain.Rules[:refRule], append([]*Rule{&rule}, existingChain.Rules[refRule:]...)...)
+				}
+				rule.Handle = Optional(fake.nextHandle)
+			case replaceVerb:
+				existingChain.Rules[refRule] = &rule
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}

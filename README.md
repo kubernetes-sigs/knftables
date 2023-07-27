@@ -91,6 +91,8 @@ in the `nft` binary. Currently-supported operations are:
 - `tx.Create()`: creates an object, which must not already exist, as with `nft create`
 - `tx.Flush()`: flushes the contents of a table/chain/set/map, as with `nft flush`
 - `tx.Delete()`: deletes an object, as with `nft delete`
+- `tx.Insert()`: inserts a rule before another rule, as with `nft insert rule`
+- `tx.Replace()`: replaces a rule, as with `nft replace rule`
 
 There is also currently one helper function:
 

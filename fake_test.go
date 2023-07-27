@@ -194,3 +194,178 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 }
+
+func assertRules(t *testing.T, fake *Fake, expected ...string) {
+	t.Helper()
+
+	actual, err := fake.ListRules(context.Background(), "test")
+	if err != nil {
+		t.Fatalf("could not ListRules: %v", err)
+	}
+
+	if len(actual) != len(expected) {
+		t.Errorf("expected %d rules, got %d", len(expected), len(actual))
+	}
+
+	for i := range expected {
+		if i == len(actual) {
+			break
+		}
+		if actual[i].Rule != expected[i] {
+			t.Errorf("expected rule %d to be %q but got %q", i+1, expected[i], actual[i].Rule)
+		}
+	}
+
+	rulesByHandle := make(map[int][]string)
+	for _, r := range actual {
+		rulesByHandle[*r.Handle] = append(rulesByHandle[*r.Handle], r.Rule)
+	}
+	for handle, rules := range rulesByHandle {
+		if len(rules) > 1 {
+			t.Errorf("multiple rules for handle %d: %v", handle, rules)
+		}
+	}
+}
+
+func TestFakeAddInsertReplace(t *testing.T) {
+	fake := NewFake(IPv4Family, "kube-proxy")
+	tx := NewTransaction()
+
+	tx.Add(&Table{})
+	tx.Add(&Chain{
+		Name: "test",
+	})
+
+	// Test basic Add
+	tx.Add(&Rule{
+		Chain: "test",
+		Rule:  "first",
+	})
+	tx.Add(&Rule{
+		Chain: "test",
+		Rule:  "second",
+	})
+	tx.Add(&Rule{
+		Chain: "test",
+		Rule:  "third",
+	})
+	err := fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	assertRules(t, fake, "first", "second", "third")
+
+	// (can't fail: we just did this in assertRules)
+	rules, _ := fake.ListRules(context.Background(), "test")
+	firstHandle := *rules[0].Handle
+	secondHandle := *rules[1].Handle
+	thirdHandle := *rules[2].Handle
+
+	// Test Add with Handle or Index
+	tx = NewTransaction()
+	// Should go after "second"
+	tx.Add(&Rule{
+		Chain: "test",
+		Rule:  "fourth",
+		Index: Optional(1),
+	})
+	// Should go after "first"
+	tx.Add(&Rule{
+		Chain:  "test",
+		Rule:   "fifth",
+		Handle: Optional(firstHandle),
+	})
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	assertRules(t, fake, "first", "fifth", "second", "fourth", "third")
+
+	// Test Insert
+	tx = NewTransaction()
+	// Should go first
+	tx.Insert(&Rule{
+		Chain: "test",
+		Rule:  "sixth",
+	})
+	// Should go before "second"
+	tx.Insert(&Rule{
+		Chain:  "test",
+		Rule:   "seventh",
+		Handle: Optional(secondHandle),
+	})
+	// Should go before "fourth". ("fourth" was rule[3] before this
+	// transaction and the previous two operations added two more rules
+	// before it, so it should now have index 5.)
+	tx.Insert(&Rule{
+		Chain: "test",
+		Rule:  "eighth",
+		Index: Optional(5),
+	})
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	assertRules(t, fake, "sixth", "first", "fifth", "seventh", "second", "eighth", "fourth", "third")
+
+	// Test Replace. And Delete while we're here... the chain is getting kind of long
+	tx = NewTransaction()
+
+	tx.Replace(&Rule{
+		Chain:  "test",
+		Rule:   "ninth",
+		Handle: Optional(secondHandle),
+	})
+	tx.Delete(&Rule{
+		Chain:  "test",
+		Handle: Optional(firstHandle),
+	})
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	assertRules(t, fake, "sixth", "fifth", "seventh", "ninth", "eighth", "fourth", "third")
+
+	// Re-fetch handles; Replace should not have changed the handle for its rule.
+	// (can't fail: we just did this in assertRules)
+	rules, _ = fake.ListRules(context.Background(), "test")
+	if *rules[3].Handle != secondHandle {
+		t.Errorf("Replace changed the rule handle: expected %d got %d", secondHandle, *rules[3].Handle)
+	}
+	if *rules[6].Handle != thirdHandle {
+		t.Errorf("Handle for original third rule changed? expected %d got %d", thirdHandle, *rules[6].Handle)
+	}
+
+	// Test edge cases
+	tx = NewTransaction()
+	tx.Add(&Rule{
+		Chain: "test",
+		Rule:  "tenth",
+		Index: Optional(len(rules) - 1),
+	})
+	tx.Insert(&Rule{
+		Chain: "test",
+		Rule:  "eleventh",
+		Index: Optional(len(rules)),
+	})
+	tx.Add(&Rule{
+		Chain: "test",
+		Rule:  "twelfth",
+		Index: Optional(0),
+	})
+	tx.Insert(&Rule{
+		Chain: "test",
+		Rule:  "thirteenth",
+		Index: Optional(0),
+	})
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	assertRules(t, fake, "thirteenth", "sixth", "twelfth", "fifth", "seventh", "ninth", "eighth", "fourth", "third", "eleventh", "tenth")
+}

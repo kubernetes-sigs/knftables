@@ -85,11 +85,29 @@ func (tx *Transaction) Add(obj Object) {
 }
 
 // Create adds an "nft create" operation to tx, creating obj, which must not already
-// exist. The Create() call always succeeds, but if obj is invalid, already exists, or is
-// inconsistent with the existing nftables state, then an error will be returned when the
-// transaction is Run.
+// exist. (If obj is a Rule, it will be appended to the end of its chain, or else added
+// after the Rule indicated by this rule's Index or Handle.) The Create() call always
+// succeeds, but if obj is invalid, already exists, or is inconsistent with the existing
+// nftables state, then an error will be returned when the transaction is Run.
 func (tx *Transaction) Create(obj Object) {
 	tx.operation(createVerb, obj)
+}
+
+// Insert adds an "nft insert" operation to tx, inserting obj (which must be a Rule) at
+// the start of its chain, or before the other Rule indicated by this rule's Index or
+// Handle. The Insert() call always succeeds, but if obj is invalid or is inconsistent
+// with the existing nftables state, then an error will be returned when the transaction
+// is Run.
+func (tx *Transaction) Insert(obj Object) {
+	tx.operation(insertVerb, obj)
+}
+
+// Replace adds an "nft replace" operation to tx, replacing an existing rule with obj
+// (which must be a Rule). The Replace() call always succeeds, but if obj is invalid, does
+// not contain the Handle of an existing rule, or is inconsistent with the existing
+// nftables state, then an error will be returned when the transaction is Run.
+func (tx *Transaction) Replace(obj Object) {
+	tx.operation(replaceVerb, obj)
 }
 
 // Flush adds an "nft flush" operation to tx, clearing the contents of obj. The Flush()

@@ -60,6 +60,18 @@ func Test_validate(t *testing.T) {
 			object: &Table{Handle: Optional(5)},
 		},
 		{
+			name:   "invalid insert table",
+			verb:   insertVerb,
+			object: &Table{},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid replace table",
+			verb:   replaceVerb,
+			object: &Table{},
+			err:    "not implemented",
+		},
+		{
 			name:   "invalid add table with Handle",
 			verb:   addVerb,
 			object: &Table{Handle: Optional(5)},
@@ -111,6 +123,18 @@ func Test_validate(t *testing.T) {
 			name:   "delete chain by handle (without name)",
 			verb:   deleteVerb,
 			object: &Chain{Handle: Optional(5)},
+		},
+		{
+			name:   "invalid insert chain",
+			verb:   insertVerb,
+			object: &Chain{Name: "mychain"},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid replace chain",
+			verb:   replaceVerb,
+			object: &Chain{Name: "mychain"},
+			err:    "not implemented",
 		},
 		{
 			name:   "invalid add chain without name",
@@ -292,6 +316,18 @@ func Test_validate(t *testing.T) {
 			object: &Set{Handle: Optional(5)},
 		},
 		{
+			name:   "invalid insert set",
+			verb:   insertVerb,
+			object: &Set{Name: "myset", Type: "ipv4_addr"},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid replace set",
+			verb:   replaceVerb,
+			object: &Set{Name: "myset", Type: "ipv4_addr"},
+			err:    "not implemented",
+		},
+		{
 			name:   "invalid add set without Name",
 			verb:   addVerb,
 			object: &Set{Type: "ipv4_addr"},
@@ -356,6 +392,18 @@ func Test_validate(t *testing.T) {
 			name:   "delete map by Handle without Name",
 			verb:   deleteVerb,
 			object: &Map{Handle: Optional(5)},
+		},
+		{
+			name:   "invalid insert map",
+			verb:   insertVerb,
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid replace map",
+			verb:   replaceVerb,
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+			err:    "not implemented",
 		},
 		{
 			name:   "invalid add map without Name",
@@ -434,6 +482,18 @@ func Test_validate(t *testing.T) {
 		{
 			name:   "invalid flush element",
 			verb:   flushVerb,
+			object: &Element{Name: "myset", Key: "10.0.0.1"},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid insert element",
+			verb:   insertVerb,
+			object: &Element{Name: "myset", Key: "10.0.0.1"},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid replace element",
+			verb:   replaceVerb,
 			object: &Element{Name: "myset", Key: "10.0.0.1"},
 			err:    "not implemented",
 		},
