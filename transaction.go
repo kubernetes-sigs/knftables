@@ -64,33 +64,31 @@ func (tx *Transaction) asCommandBuf(family Family, table string) (io.Reader, err
 	return buf, nil
 }
 
-// Add adds an "nft add" operation to tx, ensuring that obj exists by creating it if it
-// did not already exist. The Add() call always succeeds, but if obj is invalid, or
-// inconsistent with the existing nftables state, then an error will be returned when the
-// transaction is Run.
-func (tx *Transaction) Add(obj Object) {
+func (tx *Transaction) operation(verb verb, obj Object) {
 	if tx.err != nil {
 		return
 	}
-	if tx.err = obj.validate(addVerb); tx.err != nil {
+	if tx.err = obj.validate(verb); tx.err != nil {
 		return
 	}
 
-	tx.operations = append(tx.operations, operation{verb: addVerb, obj: obj})
+	tx.operations = append(tx.operations, operation{verb: verb, obj: obj})
+}
+
+// Add adds an "nft add" operation to tx, ensuring that obj exists by creating it if it
+// did not already exist. (If obj is a Rule, it will be appended to the end of its chain,
+// or else added after the Rule indicated by this rule's Index or Handle.) The Add() call
+// always succeeds, but if obj is invalid, or inconsistent with the existing nftables
+// state, then an error will be returned when the transaction is Run.
+func (tx *Transaction) Add(obj Object) {
+	tx.operation(addVerb, obj)
 }
 
 // Flush adds an "nft flush" operation to tx, clearing the contents of obj. The Flush()
 // call always succeeds, but if obj does not exist (or does not support flushing) then an
 // error will be returned when the transaction is Run.
 func (tx *Transaction) Flush(obj Object) {
-	if tx.err != nil {
-		return
-	}
-	if tx.err = obj.validate(flushVerb); tx.err != nil {
-		return
-	}
-
-	tx.operations = append(tx.operations, operation{verb: flushVerb, obj: obj})
+	tx.operation(flushVerb, obj)
 }
 
 // Delete adds an "nft delete" operation to tx, deleting obj. The Delete() call always
@@ -98,14 +96,7 @@ func (tx *Transaction) Flush(obj Object) {
 // provided (eg, Handle is required but not set) then an error will be returned when the
 // transaction is Run.
 func (tx *Transaction) Delete(obj Object) {
-	if tx.err != nil {
-		return
-	}
-	if tx.err = obj.validate(deleteVerb); tx.err != nil {
-		return
-	}
-
-	tx.operations = append(tx.operations, operation{verb: deleteVerb, obj: obj})
+	tx.operation(deleteVerb, obj)
 }
 
 // AddRule is a helper for adding Rule objects. It takes a series of string and []string
