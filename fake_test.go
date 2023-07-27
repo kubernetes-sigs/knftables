@@ -28,6 +28,12 @@ import (
 
 func TestFakeRun(t *testing.T) {
 	fake := NewFake(IPv4Family, "kube-proxy")
+
+	_, err := fake.List(context.Background(), "chains")
+	if err == nil || !IsNotFound(err) {
+		t.Errorf("expected table not found error but got: %v", err)
+	}
+
 	tx := NewTransaction()
 
 	tx.Add(&Table{})
@@ -80,7 +86,7 @@ func TestFakeRun(t *testing.T) {
 		Value: "drop",
 	})
 
-	err := fake.Run(context.Background(), tx)
+	err = fake.Run(context.Background(), tx)
 	if err != nil {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
@@ -229,14 +235,32 @@ func assertRules(t *testing.T, fake *Fake, expected ...string) {
 
 func TestFakeAddInsertReplace(t *testing.T) {
 	fake := NewFake(IPv4Family, "kube-proxy")
-	tx := NewTransaction()
 
+	tx := NewTransaction()
 	tx.Add(&Table{})
+	err := fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	_, err = fake.ListRules(context.Background(), "test")
+	if err == nil || !IsNotFound(err) {
+		t.Errorf("expected chain not found but got: %v", err)
+	}
+
+	tx = NewTransaction()
 	tx.Add(&Chain{
 		Name: "test",
 	})
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	assertRules(t, fake, /* no rules */)
 
 	// Test basic Add
+	tx = NewTransaction()
 	tx.Add(&Rule{
 		Chain: "test",
 		Rule:  "first",
@@ -249,7 +273,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		Chain: "test",
 		Rule:  "third",
 	})
-	err := fake.Run(context.Background(), tx)
+	err = fake.Run(context.Background(), tx)
 	if err != nil {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}

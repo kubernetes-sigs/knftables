@@ -95,7 +95,7 @@ func (fake *Fake) Present() error {
 // List is part of Interface.
 func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error) {
 	if fake.Table == nil {
-		return nil, fmt.Errorf("no such table %q", fake.table)
+		return nil, notFoundError("no such table %q", fake.table)
 	}
 
 	var result []string
@@ -124,11 +124,11 @@ func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error)
 // ListRules is part of Interface
 func (fake *Fake) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
 	if fake.Table == nil {
-		return nil, fmt.Errorf("no such chain %q", chain)
+		return nil, notFoundError("no such chain %q", chain)
 	}
 	ch := fake.Table.Chains[chain]
 	if ch == nil {
-		return nil, fmt.Errorf("no such chain %q", chain)
+		return nil, notFoundError("no such chain %q", chain)
 	}
 	return ch.Rules, nil
 }
@@ -136,7 +136,7 @@ func (fake *Fake) ListRules(ctx context.Context, chain string) ([]*Rule, error) 
 // ListElements is part of Interface
 func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
 	if fake.Table == nil {
-		return nil, fmt.Errorf("no such %s %q", objectType, name)
+		return nil, notFoundError("no such %s %q", objectType, name)
 	}
 	if objectType == "set" {
 		s := fake.Table.Sets[name]
@@ -149,7 +149,7 @@ func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]
 			return m.Elements, nil
 		}
 	}
-	return nil, fmt.Errorf("no such %s %q", objectType, name)
+	return nil, notFoundError("no such %s %q", objectType, name)
 }
 
 // Define is part of Interface
