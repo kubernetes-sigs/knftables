@@ -18,7 +18,6 @@ package nftables
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 )
 
@@ -123,40 +122,4 @@ func (tx *Transaction) Flush(obj Object) {
 // transaction is Run.
 func (tx *Transaction) Delete(obj Object) {
 	tx.operation(deleteVerb, obj)
-}
-
-// AddRule is a helper for adding Rule objects. It takes a series of string and []string
-// arguments and concatenates them together into a single rule. As with "nft add rule",
-// you may include a comment (which must be quoted) as the last clause of the rule.
-func (tx *Transaction) AddRule(chain string, args ...interface{}) {
-	if tx.err != nil {
-		return
-	}
-
-	buf := &bytes.Buffer{}
-	for _, arg := range args {
-		if buf.Len() > 0 {
-			buf.WriteByte(' ')
-		}
-		switch x := arg.(type) {
-		case string:
-			buf.WriteString(x)
-		case []string:
-			for j, s := range x {
-				if j > 0 {
-					buf.WriteByte(' ')
-				}
-				buf.WriteString(s)
-			}
-		default:
-			panic(fmt.Sprintf("unknown argument type: %T", x))
-		}
-	}
-
-	rule, comment := splitComment(buf.String())
-	tx.Add(&Rule{
-		Chain:   chain,
-		Rule:    rule,
-		Comment: comment,
-	})
 }

@@ -172,7 +172,8 @@ type Rule struct {
 	Chain string
 
 	// Rule is the rule in standard nftables syntax. (Should be empty on Delete, but
-	// is ignored if not.)
+	// is ignored if not.) Note that this does not include any rule comment, which is
+	// separate from the rule itself.
 	Rule string
 
 	// Comment is an optional comment for the rule.

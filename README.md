@@ -68,10 +68,18 @@ tx.Flush(&nftables.Chain{
         Name: "mychain",
 })
 
-tx.AddRule("mychain",
-        "$IP daddr", destIP,
-        "jump", destChain,
-)
+var destIP net.IP
+var destPort uint16
+...
+tx.Add(&nftables.Rule{
+        Chain: "mychain",
+        Rule:  nftables.Concat(
+                "$IP daddr", destIP,
+                "$IP protocol", "tcp",
+                "th port", destPort,
+                "jump", destChain,
+        )
+})
 
 err := nft.Run(context, tx)
 ```
@@ -94,11 +102,6 @@ in the `nft` binary. Currently-supported operations are:
 - `tx.Insert()`: inserts a rule before another rule, as with `nft insert rule`
 - `tx.Replace()`: replaces a rule, as with `nft replace rule`
 
-There is also currently one helper function:
-
-- `tx.AddRule()`: wrapper around `tx.Add(&nftables.Rule{...})` that
-  makes it easy to assemble the text of a rule from multiple pieces.
-
 ## Objects
 
 The `Transaction` methods take arguments of type `nftables.Object`.
@@ -114,6 +117,12 @@ The currently-supported objects are:
 Optional fields in objects can be filled in with the help of the
 `Optional()` function, which just returns a pointer to its
 argument.
+
+`Concat()` can be used to concatenate a series of strings, `[]string`
+arrays, and other arguments (including numbers, `net.IP`s /
+`net.IPNet`s, and anything else that can be formatted usefully via
+`fmt.Sprintf("%s")`) together into a single string. This is often
+useful when constructing `Rule`s.
 
 The `Join()` and `Split()` helper functions can be used with set and
 map keys and values, to convert between multiple values specified
@@ -188,9 +197,3 @@ The fact that the API uses functions and objects (e.g.
 as textual input to `nft` (e.g. `tx.Exec("add chain ...")`) is mostly
 just because it's _much_ easier to have a fake implementation for unit
 tests this way.
-
-The `tx.AddRule()` API is 100% just copied from the `LineBuffer` used
-by the kube-proxy iptables backend. I considered having a
-`tx.AddElement()` helper too, but that doesn't work as well, because
-elements aren't "flat" like rules are, so you can't just squish
-multiple `string` and `[]string` elements together.

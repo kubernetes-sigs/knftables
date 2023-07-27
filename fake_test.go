@@ -18,7 +18,6 @@ package nftables
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -40,10 +39,11 @@ func TestFakeRun(t *testing.T) {
 		Chain: "chain",
 		Rule:  "$IP daddr 10.0.0.0/8 drop",
 	})
-	tx.AddRule("chain",
-		"masquerade",
-		"comment", fmt.Sprintf("%q", "comment via AddRule"),
-	)
+	tx.Add(&Rule{
+		Chain:   "chain",
+		Rule:    "masquerade",
+		Comment: Optional("comment"),
+	})
 
 	tx.Add(&Chain{
 		Name: "anotherchain",
@@ -106,7 +106,7 @@ func TestFakeRun(t *testing.T) {
 	if chain.Rules[1].Rule != expectedRule {
 		t.Fatalf("unexpected chain.Rules content: expected %q, got %q", expectedRule, chain.Rules[1].Rule)
 	}
-	expectedComment := "comment via AddRule"
+	expectedComment := "comment"
 	if chain.Rules[1].Comment == nil {
 		t.Fatalf("unexpected chain.Rules content: expected comment %q, got nil", expectedComment)
 	} else if *chain.Rules[1].Comment != expectedComment {
@@ -143,7 +143,7 @@ func TestFakeRun(t *testing.T) {
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
-		add rule ip kube-proxy chain masquerade comment "comment via AddRule"
+		add rule ip kube-proxy chain masquerade comment "comment"
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 : goto anotherchain }

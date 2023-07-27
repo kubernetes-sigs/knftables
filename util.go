@@ -73,6 +73,41 @@ func ParsePriority(family Family, priority string) (int, error) {
 	return val + modVal, nil
 }
 
+// Concat is a helper (primarily) for constructing Rule objects. It takes a series of
+// arguments and concatenates them together into a single string with spaces between the
+// arguments. Strings are output as-is, string arrays are output element by element,
+// numbers are output as with `fmt.Sprintf("%d")`, and all other types are output as with
+// `fmt.Sprintf("%s")`.
+func Concat(args ...interface{}) string {
+	b := &strings.Builder{}
+	for _, arg := range args {
+		// Ignore empty array arguments
+		if x, ok := arg.([]string); ok && len(x) == 0 {
+			continue
+		}
+
+		if b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		switch x := arg.(type) {
+		case string:
+			b.WriteString(x)
+		case []string:
+			for j, s := range x {
+				if j > 0 {
+					b.WriteByte(' ')
+				}
+				b.WriteString(s)
+			}
+		case int, uint, int16, uint16, int32, uint32, int64, uint64:
+			fmt.Fprintf(b, "%d", x)
+		default:
+			fmt.Fprintf(b, "%s", x)
+		}
+	}
+	return b.String()
+}
+
 // Join joins multiple string values together into a multi-valued set/map key/value.
 func Join(values ...string) string {
 	return strings.Join(values, " . ")
