@@ -244,7 +244,7 @@ func Test_splitComment(t *testing.T) {
 			comment: Optional("comment "),
 		},
 	} {
-		t.Run(tc.name, func (t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			rule, comment := splitComment(tc.line)
 			if rule != tc.rule {
 				t.Errorf("bad rule: expected %q got %q", tc.rule, rule)
@@ -334,7 +334,7 @@ func Test_splitMapValue(t *testing.T) {
 			value:   `" : drop "`,
 		},
 	} {
-		t.Run(tc.name, func (t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			key, comment, value := splitMapValue(tc.line)
 			if key != tc.key {
 				t.Errorf("bad key: expected %q got %q", tc.key, key)
@@ -372,7 +372,7 @@ func TestListRules(t *testing.T) {
 			listOutput: []*Rule{},
 		},
 		{
-			name:      "no rules",
+			name: "no rules",
 			nftOutput: `
 				table ip testing { # handle 1
 					chain testchain { # handle 165
@@ -381,7 +381,7 @@ func TestListRules(t *testing.T) {
 			listOutput: []*Rule{},
 		},
 		{
-			name:      "no rules",
+			name: "no rules",
 			nftOutput: `
 				table ip testing { # handle 1
 					chain testchain { # handle 165
@@ -396,7 +396,7 @@ func TestListRules(t *testing.T) {
 			listOutput: []*Rule{},
 		},
 		{
-			name:      "normal output",
+			name: "normal output",
 			nftOutput: `
 				table ip testing { # handle 1
 				  yeah I don't think nftables ever actually outputs random extra lines like this but maybe?
@@ -408,20 +408,20 @@ func TestListRules(t *testing.T) {
 					}
 				}`,
 			listOutput: []*Rule{
-				&Rule{
-					Chain: "testchain",
-					Rule: "ct state { established, related } accept",
+				{
+					Chain:  "testchain",
+					Rule:   "ct state { established, related } accept",
 					Handle: Optional(169),
 				},
-				&Rule{
-					Chain: "testchain",
-					Rule: "ct status dnat accept",
+				{
+					Chain:   "testchain",
+					Rule:    "ct status dnat accept",
 					Comment: Optional("This rule does something"),
-					Handle: Optional(170),
+					Handle:  Optional(170),
 				},
-				&Rule{
-					Chain: "testchain",
-					Rule: `iifname "lo" accept`,
+				{
+					Chain:  "testchain",
+					Rule:   `iifname "lo" accept`,
 					Handle: Optional(171),
 				},
 			},
@@ -483,7 +483,7 @@ func TestListElements(t *testing.T) {
 		{
 			name:       "no elements",
 			objectType: "set",
-			nftOutput:  `
+			nftOutput: `
 				table ip testing {
 					set test {
 						type ipv4_addr . inet_proto . inet_service
@@ -495,7 +495,7 @@ func TestListElements(t *testing.T) {
 		{
 			name:       "no elements",
 			objectType: "set",
-			nftOutput:  `
+			nftOutput: `
 				table ip testing {
 					set test {
 						type ipv4_addr . inet_proto . inet_service
@@ -508,7 +508,7 @@ func TestListElements(t *testing.T) {
 		{
 			name:       "one element",
 			objectType: "map",
-			nftOutput:  `
+			nftOutput: `
 				table ip testing {
 					map test {
 						type ipv4_addr . inet_proto . inet_service : verdict
@@ -516,7 +516,7 @@ func TestListElements(t *testing.T) {
 					}
 				}`,
 			listOutput: []*Element{
-				&Element{
+				{
 					Name:  "test",
 					Key:   "192.168.0.1 . tcp . 80",
 					Value: "goto chain1",
@@ -526,7 +526,7 @@ func TestListElements(t *testing.T) {
 		{
 			name:       "two elements",
 			objectType: "map",
-			nftOutput:  `
+			nftOutput: `
 				table ip testing {
 					map test {
 						type ipv4_addr . inet_proto . inet_service : verdict
@@ -535,12 +535,12 @@ func TestListElements(t *testing.T) {
 					}
 				}`,
 			listOutput: []*Element{
-				&Element{
+				{
 					Name:  "test",
 					Key:   "192.168.0.1 . tcp . 80",
 					Value: "goto chain1",
 				},
-				&Element{
+				{
 					Name:    "test",
 					Key:     "192.168.0.2 . tcp . 443",
 					Comment: Optional("foo"),
@@ -551,7 +551,7 @@ func TestListElements(t *testing.T) {
 		{
 			name:       "three elements",
 			objectType: "set",
-			nftOutput:  `
+			nftOutput: `
 				table ip testing {
 					set test {
 						type ipv4_addr . inet_proto . inet_service
@@ -561,15 +561,15 @@ func TestListElements(t *testing.T) {
 					}
 				}`,
 			listOutput: []*Element{
-				&Element{
+				{
 					Name: "test",
 					Key:  "192.168.0.1 . tcp . 80",
 				},
-				&Element{
+				{
 					Name: "test",
 					Key:  "192.168.0.3 . udp . 80",
 				},
-				&Element{
+				{
 					Name:    "test",
 					Key:     "192.168.0.2 . tcp . 443",
 					Comment: Optional("foo"),

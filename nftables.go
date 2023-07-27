@@ -129,7 +129,7 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 		return err
 	}
 
-	args := make([]string, 0, 2*len(nft.defines) + 2)
+	args := make([]string, 0, 2*len(nft.defines)+2)
 	for _, def := range nft.defines {
 		args = append(args, "-D", fmt.Sprintf("%s=%s", def.name, def.value))
 	}

@@ -88,7 +88,7 @@ func TestError(t *testing.T) {
 			isExists:   true,
 		},
 	} {
-		t.Run(tc.name, func (t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			if IsNotFound(tc.err) != tc.isNotFound {
 				t.Errorf("expected IsNotFound %v, got %v", tc.isNotFound, IsNotFound(tc.err))
 			}
