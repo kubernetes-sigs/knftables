@@ -141,6 +141,8 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 	return err
 }
 
+// jsonVal looks up key in json; if it exists and is of type T, it returns (json[key], true).
+// Otherwise it returns (_, false).
 func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 	if ifVal, exists := json[key]; exists {
 		tVal, ok := ifVal.(T)
@@ -149,6 +151,84 @@ func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 		var zero T
 		return zero, false
 	}
+}
+
+// getJSONObjects takes the output of "nft -j list", validates it, and returns an array
+// of just the objects of objectType.
+func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, error) {
+	// listOutput should contain JSON looking like:
+	//
+	// {
+	//   "nftables": [
+	//     {
+	//       "metainfo": {
+	//         "json_schema_version": 1,
+	//         ...
+	//       }
+	//     },
+	//     {
+	//       "chain": {
+	//         "family": "ip",
+	//         "table": "kube-proxy",
+	//         "name": "KUBE-SERVICES",
+	//         "handle": 3
+	//       }
+	//     },
+	//     {
+	//       "chain": {
+	//         "family": "ip",
+	//         "table": "kube-proxy",
+	//         "name": "KUBE-NODEPORTS",
+	//         "handle": 4
+	//       }
+	//     },
+	//     ...
+	//   ]
+	// }
+	//
+	// In this case, given objectType "chain", we would return
+	//
+	// [
+	//   {
+	//     "family": "ip",
+	//     "table": "kube-proxy",
+	//     "name": "KUBE-SERVICES",
+	//     "handle": 3
+	//   },
+	//   {
+	//     "family": "ip",
+	//     "table": "kube-proxy",
+	//     "name": "KUBE-NODEPORTS",
+	//     "handle": 4
+	//   },
+	//   ...
+	// ]
+
+	jsonResult := map[string][]map[string]map[string]interface{}{}
+	if err := json.Unmarshal([]byte(listOutput), &jsonResult); err != nil {
+		return nil, fmt.Errorf("could not parse nft output: %w", err)
+	}
+
+	nftablesResult := jsonResult["nftables"]
+	if nftablesResult == nil || len(nftablesResult) == 0 {
+		return nil, fmt.Errorf("could not find result in nft output %q", listOutput)
+	}
+	metainfo := nftablesResult[0]["metainfo"]
+	if metainfo == nil {
+		return nil, fmt.Errorf("could not find metadata in nft output %q", listOutput)
+	}
+	if version, ok := jsonVal[float64](metainfo, "json_schema_version"); !ok || version != 1.0 {
+		return nil, fmt.Errorf("could not find supported json_schema_version in nft output %q", listOutput)
+	}
+
+	var objects []map[string]interface{}
+	for _, objContainer := range nftablesResult {
+		obj := objContainer[objectType]
+		if obj != nil {
+			objects = append(objects, obj)
+		}
+	}
+	return objects, nil
 }
 
 // List is part of Interface.
@@ -170,50 +250,13 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
-	// out contains JSON looking like:
-	// {
-	//   "nftables": [
-	//     {
-	//       "metainfo": {
-	//         "json_schema_version": 1
-	//         ...
-	//       }
-	//     },
-	//     {
-	//       "chain": {
-	//         "family": "ip",
-	//         "table": "kube_proxy",
-	//         "name": "KUBE-SERVICES",
-	//         "handle": 3,
-	//       }
-	//     },
-	//     ...
-	//   ]
-	// }
-
-	jsonResult := map[string][]map[string]map[string]interface{}{}
-	if err := json.Unmarshal([]byte(out), &jsonResult); err != nil {
-		return nil, fmt.Errorf("could not parse nft output: %w", err)
-	}
-
-	nftablesResult := jsonResult["nftables"]
-	if nftablesResult == nil || len(nftablesResult) == 0 {
-		return nil, fmt.Errorf("could not find result in nft output %q", out)
-	}
-	metainfo := nftablesResult[0]["metainfo"]
-	if metainfo == nil {
-		return nil, fmt.Errorf("could not find metadata in nft output %q", out)
-	}
-	if version, ok := jsonVal[float64](metainfo, "json_schema_version"); !ok || version != 1.0 {
-		return nil, fmt.Errorf("could not find supported json_schema_version in nft output %q", out)
+	objects, err := getJSONObjects(out, typeSingular)
+	if err != nil {
+		return nil, err
 	}
 
 	var result []string
-	for _, objContainer := range nftablesResult {
-		obj := objContainer[typeSingular]
-		if obj == nil {
-			continue
-		}
+	for _, obj := range objects {
 		objTable, _ := jsonVal[string](obj, "table")
 		if objTable != nft.table {
 			continue
@@ -223,7 +266,6 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 			result = append(result, name)
 		}
 	}
-
 	return result, nil
 }
 
