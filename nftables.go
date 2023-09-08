@@ -359,12 +359,15 @@ func (nft *realNFTables) ListElements(ctx context.Context, objectType, name stri
 			continue
 		}
 
-		elements = append(elements, &Element{
+		elem := &Element{
 			Name:    name,
-			Key:     key,
-			Value:   value,
+			Key:     strings.Split(key, " . "),
 			Comment: comment,
-		})
+		}
+		if value != "" {
+			elem.Value = strings.Split(value, " . ")
+		}
+		elements = append(elements, elem)
 	}
 
 	return elements, nil

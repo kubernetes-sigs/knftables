@@ -19,6 +19,7 @@ package nftables
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Object implementation for Table
@@ -318,7 +319,7 @@ func (element *Element) validate(verb verb) error {
 	if element.Name == "" {
 		return fmt.Errorf("no set/map name specified for element")
 	}
-	if element.Key == "" {
+	if len(element.Key) == 0 {
 		return fmt.Errorf("no key specified for element")
 	}
 
@@ -332,14 +333,15 @@ func (element *Element) validate(verb verb) error {
 }
 
 func (element *Element) writeOperation(verb verb, family Family, table string, writer io.Writer) {
-	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, family, table, element.Name, element.Key)
+	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, family, table, element.Name,
+		strings.Join(element.Key, " . "))
 
 	if (verb == addVerb || verb == createVerb) && element.Comment != nil {
 		fmt.Fprintf(writer, " comment %q", *element.Comment)
 	}
 
-	if element.Value != "" {
-		fmt.Fprintf(writer, " : %s", element.Value)
+	if len(element.Value) != 0 {
+		fmt.Fprintf(writer, " : %s", strings.Join(element.Value, " . "))
 	}
 
 	fmt.Fprintf(writer, " }\n")

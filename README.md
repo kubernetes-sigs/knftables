@@ -124,10 +124,6 @@ arrays, and other arguments (including numbers, `net.IP`s /
 `fmt.Sprintf("%s")`) together into a single string. This is often
 useful when constructing `Rule`s.
 
-The `Join()` and `Split()` helper functions can be used with set and
-map keys and values, to convert between multiple values specified
-separately, and a single string with the values separated by dots.
-
 ## `nftables.Fake`
 
 There is a fake (in-memory) implementation of `nftables.Interface` for

@@ -518,8 +518,8 @@ func TestListElements(t *testing.T) {
 			listOutput: []*Element{
 				{
 					Name:  "test",
-					Key:   "192.168.0.1 . tcp . 80",
-					Value: "goto chain1",
+					Key:   []string{"192.168.0.1", "tcp", "80"},
+					Value: []string{"goto chain1"},
 				},
 			},
 		},
@@ -537,14 +537,14 @@ func TestListElements(t *testing.T) {
 			listOutput: []*Element{
 				{
 					Name:  "test",
-					Key:   "192.168.0.1 . tcp . 80",
-					Value: "goto chain1",
+					Key:   []string{"192.168.0.1", "tcp", "80"},
+					Value: []string{"goto chain1"},
 				},
 				{
 					Name:    "test",
-					Key:     "192.168.0.2 . tcp . 443",
+					Key:     []string{"192.168.0.2", "tcp", "443"},
 					Comment: Optional("foo"),
-					Value:   "drop",
+					Value:   []string{"drop"},
 				},
 			},
 		},
@@ -563,15 +563,15 @@ func TestListElements(t *testing.T) {
 			listOutput: []*Element{
 				{
 					Name: "test",
-					Key:  "192.168.0.1 . tcp . 80",
+					Key:  []string{"192.168.0.1", "tcp", "80"},
 				},
 				{
 					Name: "test",
-					Key:  "192.168.0.3 . udp . 80",
+					Key:  []string{"192.168.0.3", "udp", "80"},
 				},
 				{
 					Name:    "test",
-					Key:     "192.168.0.2 . tcp . 443",
+					Key:     []string{"192.168.0.2", "tcp", "443"},
 					Comment: Optional("foo"),
 				},
 			},

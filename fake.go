@@ -19,6 +19,7 @@ package nftables
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 )
@@ -348,21 +349,26 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				switch op.verb {
 				case addVerb, createVerb:
 					element := *obj
-					element.Key = substituteDefines(element.Key, fake.defines)
+					for i := range element.Key {
+						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
+					}
 					if i := findElement(existingSet.Elements, element.Key); i != -1 {
 						if op.verb == createVerb {
-							return existsError("element %q already exists", element.Key)
+							return existsError("element %q already exists", strings.Join(element.Key, " . "))
 						}
 						existingSet.Elements[i] = &element
 					} else {
 						existingSet.Elements = append(existingSet.Elements, &element)
 					}
 				case deleteVerb:
-					key := substituteDefines(obj.Key, fake.defines)
-					if i := findElement(existingSet.Elements, obj.Key); i != -1 {
+					element := *obj
+					for i := range element.Key {
+						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
+					}
+					if i := findElement(existingSet.Elements, element.Key); i != -1 {
 						existingSet.Elements = append(existingSet.Elements[:i], existingSet.Elements[i+1:]...)
 					} else {
-						return notFoundError("no such element %q", key)
+						return notFoundError("no such element %q", strings.Join(element.Key, " . "))
 					}
 				default:
 					return fmt.Errorf("unhandled operation %q", op.verb)
@@ -375,22 +381,29 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				switch op.verb {
 				case addVerb, createVerb:
 					element := *obj
-					element.Key = substituteDefines(element.Key, fake.defines)
-					element.Value = substituteDefines(element.Value, fake.defines)
+					for i := range element.Key {
+						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
+					}
+					for i := range element.Value {
+						element.Value[i] = substituteDefines(element.Value[i], fake.defines)
+					}
 					if i := findElement(existingMap.Elements, element.Key); i != -1 {
 						if op.verb == createVerb {
-							return existsError("element %q already exists", element.Key)
+							return existsError("element %q already exists", strings.Join(element.Key, ". "))
 						}
 						existingMap.Elements[i] = &element
 					} else {
 						existingMap.Elements = append(existingMap.Elements, &element)
 					}
 				case deleteVerb:
-					key := substituteDefines(obj.Key, fake.defines)
-					if i := findElement(existingMap.Elements, obj.Key); i != -1 {
+					element := *obj
+					for i := range element.Key {
+						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
+					}
+					if i := findElement(existingMap.Elements, element.Key); i != -1 {
 						existingMap.Elements = append(existingMap.Elements[:i], existingMap.Elements[i+1:]...)
 					} else {
-						return notFoundError("no such element %q", key)
+						return notFoundError("no such element %q", strings.Join(element.Key, " . "))
 					}
 				default:
 					return fmt.Errorf("unhandled operation %q", op.verb)
@@ -485,9 +498,9 @@ func findRule(rules []*Rule, handle int) int {
 	return -1
 }
 
-func findElement(elements []*Element, key string) int {
+func findElement(elements []*Element, key []string) int {
 	for i := range elements {
-		if elements[i].Key == key {
+		if reflect.DeepEqual(elements[i].Key, key) {
 			return i
 		}
 	}
@@ -497,7 +510,7 @@ func findElement(elements []*Element, key string) int {
 // FindElement finds an element of the set with the given key. If there is no matching
 // element, it returns nil.
 func (s *FakeSet) FindElement(key ...string) *Element {
-	index := findElement(s.Elements, Join(key...))
+	index := findElement(s.Elements, key)
 	if index == -1 {
 		return nil
 	}
@@ -507,7 +520,7 @@ func (s *FakeSet) FindElement(key ...string) *Element {
 // FindElement finds an element of the map with the given key. If there is no matching
 // element, it returns nil.
 func (m *FakeMap) FindElement(key ...string) *Element {
-	index := findElement(m.Elements, Join(key...))
+	index := findElement(m.Elements, key)
 	if index == -1 {
 		return nil
 	}

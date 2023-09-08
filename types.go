@@ -312,13 +312,13 @@ type Element struct {
 	// Name is the name of the element's set or map.
 	Name string
 
-	// Key is the element key. You can use Join() to join multiple values into a
-	// single key.
-	Key string
+	// Key is the element key. (The list contains a single element for "simple" keys,
+	// or multiple elements for concatenations.)
+	Key []string
 
-	// Value is the map element value. As with Key, you can use Join() to join
-	// multiple values into a single value. For set elements, this must be "".
-	Value string
+	// Value is the map element value. As with Key, this may be a single value or
+	// multiple. For set elements, this must be nil.
+	Value []string
 
 	// Comment is an optional comment for the element
 	Comment *string

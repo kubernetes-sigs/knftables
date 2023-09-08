@@ -71,20 +71,20 @@ func TestFakeRun(t *testing.T) {
 	})
 	tx.Add(&Element{
 		Name:  "map1",
-		Key:   "192.168.0.1 . tcp . 80",
-		Value: "goto chain",
+		Key:   []string{"192.168.0.1", "tcp", "80"},
+		Value: []string{"goto chain"},
 	})
 	tx.Add(&Element{
 		Name:    "map1",
-		Key:     Join("192.168.0.2", "tcp", "443"),
-		Value:   "goto anotherchain",
+		Key:     []string{"192.168.0.2", "tcp", "443"},
+		Value:   []string{"goto anotherchain"},
 		Comment: Optional("with a comment"),
 	})
 	// Duplicate element
 	tx.Add(&Element{
 		Name:  "map1",
-		Key:   Join("192.168.0.1", "tcp", "80"),
-		Value: "drop",
+		Key:   []string{"192.168.0.1", "tcp", "80"},
+		Value: []string{"drop"},
 	})
 
 	err = fake.Run(context.Background(), tx)
@@ -127,19 +127,19 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected contents of table.Maps: %+v", table.Maps)
 	}
 
-	elem := m.FindElement("192.168.0.2 . tcp . 443")
-	if elem == nil || elem.Value != "goto anotherchain" {
+	elem := m.FindElement("192.168.0.2", "tcp", "443")
+	if elem == nil {
 		t.Fatalf("missing map element for key \"192.168.0.2 . tcp . 443\"")
-	} else if elem.Value != "goto anotherchain" {
+	} else if len(elem.Value) != 1 || elem.Value[0] != "goto anotherchain" {
 		t.Fatalf("unexpected map element for key \"192.168.0.2 . tcp . 443\": %+v", elem)
 	}
 
 	elem = m.FindElement("192.168.0.1", "tcp", "80")
 	if elem == nil {
 		t.Fatalf("missing map element for key \"192.168.0.1 . tcp . 80\"")
-	} else if elem.Value == "goto chain" {
+	} else if len(elem.Value) == 1 && elem.Value[0] == "goto chain" {
 		t.Fatalf("map element for key \"192.168.0.1 . tcp . 80\" did not get overwritten")
-	} else if elem.Value != "drop" {
+	} else if len(elem.Value) != 1 || elem.Value[0] != "drop" {
 		t.Fatalf("unexpected map element for key \"192.168.0.1 . tcp . 80\": %+v", elem)
 	}
 

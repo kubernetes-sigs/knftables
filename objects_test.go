@@ -443,37 +443,37 @@ func Test_validate(t *testing.T) {
 		{
 			name:   "add (set) element",
 			verb:   addVerb,
-			object: &Element{Name: "myset", Key: "10.0.0.1"},
+			object: &Element{Name: "myset", Key: []string{"10.0.0.1"}},
 		},
 		{
 			name:   "add (map) element",
 			verb:   addVerb,
-			object: &Element{Name: "mymap", Key: "10.0.0.1", Value: "192.168.1.1"},
+			object: &Element{Name: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}},
 		},
 		{
 			name:   "create (set) element with comment",
 			verb:   createVerb,
-			object: &Element{Name: "myset", Key: "10.0.0.1", Comment: Optional("comment")},
+			object: &Element{Name: "myset", Key: []string{"10.0.0.1"}, Comment: Optional("comment")},
 		},
 		{
 			name:   "delete (set) element",
 			verb:   deleteVerb,
-			object: &Element{Name: "myset", Key: "10.0.0.1"},
+			object: &Element{Name: "myset", Key: []string{"10.0.0.1"}},
 		},
 		{
 			name:   "delete (map) element with unnecessary Value",
 			verb:   deleteVerb,
-			object: &Element{Name: "mymap", Key: "10.0.0.1", Value: "192.168.1.1"},
+			object: &Element{Name: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}},
 		},
 		{
 			name:   "delete (map) element",
 			verb:   deleteVerb,
-			object: &Element{Name: "mymap", Key: "10.0.0.1"},
+			object: &Element{Name: "mymap", Key: []string{"10.0.0.1"}},
 		},
 		{
 			name:   "invalid add element with no Name",
 			verb:   addVerb,
-			object: &Element{Key: "10.0.0.1"},
+			object: &Element{Key: []string{"10.0.0.1"}},
 			err:    "no set/map name",
 		},
 		{
@@ -485,25 +485,25 @@ func Test_validate(t *testing.T) {
 		{
 			name:   "invalid add element with Value but no Key",
 			verb:   addVerb,
-			object: &Element{Name: "mymap", Value: "192.168.1.1"},
+			object: &Element{Name: "mymap", Value: []string{"192.168.1.1"}},
 			err:    "no key",
 		},
 		{
 			name:   "invalid flush element",
 			verb:   flushVerb,
-			object: &Element{Name: "myset", Key: "10.0.0.1"},
+			object: &Element{Name: "myset", Key: []string{"10.0.0.1"}},
 			err:    "not implemented",
 		},
 		{
 			name:   "invalid insert element",
 			verb:   insertVerb,
-			object: &Element{Name: "myset", Key: "10.0.0.1"},
+			object: &Element{Name: "myset", Key: []string{"10.0.0.1"}},
 			err:    "not implemented",
 		},
 		{
 			name:   "invalid replace element",
 			verb:   replaceVerb,
-			object: &Element{Name: "myset", Key: "10.0.0.1"},
+			object: &Element{Name: "myset", Key: []string{"10.0.0.1"}},
 			err:    "not implemented",
 		},
 	} {

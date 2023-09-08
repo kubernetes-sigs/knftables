@@ -107,13 +107,3 @@ func Concat(args ...interface{}) string {
 	}
 	return b.String()
 }
-
-// Join joins multiple string values together into a multi-valued set/map key/value.
-func Join(values ...string) string {
-	return strings.Join(values, " . ")
-}
-
-// Split splits an Element.Key or Element.Value into its component parts
-func Split(values string) []string {
-	return strings.Split(values, " . ")
-}
