@@ -339,82 +339,140 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 // ListElements is part of Interface
 func (nft *realNFTables) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
-	// We don't use the JSON API because the JSON syntax for elements, while not quite
-	// as bad as the syntax for rules, is still not easily transformable into "normal"
-	// form. (And in particular, for verdict maps, the verdict part is stored as a
-	// JSON rule, not as a string.)
-	cmd := exec.CommandContext(ctx, "nft", "list", objectType, string(nft.family), nft.table, name)
+	cmd := exec.CommandContext(ctx, "nft", "--json", "list", objectType, string(nft.family), nft.table, name)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
-	// Output looks like:
-	//
-	// table ip testing {
-	//     map map1 {
-	//         type ipv4_addr . inet_proto . inet_service : verdict
-	//         elements = { 192.168.0.1 . tcp . 80 : goto chain1,
-	//                      192.168.0.2 . tcp . 443 comment "foo" : drop }
-	//     }
-	// }
-
-	lines := strings.Split(out, "\n")
-	elements := make([]*Element, 0, len(lines))
-	sawTable := false
-	sawObject := false
-	sawElements := false
-	for _, line := range lines {
-		line := strings.TrimSpace(line)
-
-		if !sawTable {
-			if strings.HasPrefix(line, "table ") {
-				sawTable = true
-			}
-			continue
-		} else if !sawObject {
-			if strings.HasPrefix(line, objectType+" "+name) {
-				sawObject = true
-			}
-			continue
-		} else if !sawElements {
-			if !strings.HasPrefix(line, "elements = { ") {
-				continue
-			}
-			sawElements = true
-			line = strings.TrimPrefix(line, "elements = { ")
-			// fall through into the main loop body
-		} else if line == "}" {
-			break
-		}
-
-		line = strings.TrimRight(line, ", }")
-		var key, value string
-		var comment *string
-
-		if objectType == "map" {
-			key, comment, value = splitMapValue(line)
-		} else {
-			key, comment = splitComment(line)
-		}
-		if key == "" {
-			continue
-		}
-
-		elem := &Element{
-			Key:     strings.Split(key, " . "),
-			Comment: comment,
-		}
-		if value == "" {
-			elem.Set = name
-		} else {
-			elem.Map = name
-			elem.Value = strings.Split(value, " . ")
-		}
-		elements = append(elements, elem)
+	jsonSetsOrMaps, err := getJSONObjects(out, objectType)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse JSON output: %w", err)
+	}
+	if len(jsonSetsOrMaps) != 1 {
+		return nil, fmt.Errorf("unexpected JSON output from nft (multiple results)")
 	}
 
+	jsonElements, _ := jsonVal[[]interface{}](jsonSetsOrMaps[0], "elem")
+	elements := make([]*Element, 0, len(jsonElements))
+	for _, jsonElement := range jsonElements {
+		var key, value interface{}
+
+		elem := &Element{}
+		if objectType == "set" {
+			elem.Set = name
+			key = jsonElement
+		} else {
+			elem.Map = name
+			tuple, ok := jsonElement.([]interface{})
+			if !ok || len(tuple) != 2 {
+				return nil, fmt.Errorf("unexpected JSON output from nft (elem is not [key,val]: %q)", jsonElement)
+			}
+			key, value = tuple[0], tuple[1]
+		}
+
+		// If the element has a comment, then key will be a compound object like:
+		//
+		//   {
+		//     "elem": {
+		//       "val": "192.168.0.1",
+		//       "comment": "this is a comment"
+		//     }
+		//   }
+		//
+		// (Where "val" contains the value that key would have held if there was no
+		// comment.)
+		if obj, ok := key.(map[string]interface{}); ok {
+			if compoundElem, ok := jsonVal[map[string]interface{}](obj, "elem"); ok {
+				if key, ok = jsonVal[interface{}](compoundElem, "val"); !ok {
+					return nil, fmt.Errorf("unexpected JSON output from nft (elem with no val: %q)", jsonElement)
+				}
+				if comment, ok := jsonVal[string](compoundElem, "comment"); ok {
+					elem.Comment = &comment
+				}
+			}
+		}
+
+		elem.Key, err = parseElementValue(key)
+		if err != nil {
+			return nil, err
+		}
+		if value != nil {
+			elem.Value, err = parseElementValue(value)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		elements = append(elements, elem)
+	}
 	return elements, nil
+}
+
+// parseElementValue parses a JSON element key/value, handling concatenations, and
+// converting numeric or "verdict" values to strings.
+func parseElementValue(json interface{}) ([]string, error) {
+	// json can be:
+	//
+	//   - a single string, e.g. "192.168.1.3"
+	//
+	//   - a single number, e.g. 80
+	//
+	//   - a concatenation, expressed as an object containing an array of simple
+	//     values:
+	//        {
+	//          "concat": [
+	//            "192.168.1.3",
+	//            "tcp",
+	//            80
+	//          ]
+	//        }
+	//
+	//   - a verdict (for a vmap value), expressed as an object:
+	//        {
+	//          "drop": null
+	//        }
+	//
+	//        {
+	//          "goto": {
+	//            "target": "destchain"
+	//          }
+	//        }
+
+	switch val := json.(type) {
+	case string:
+		return []string{val}, nil
+	case float64:
+		return []string{fmt.Sprintf("%d", int(val))}, nil
+	case map[string]interface{}:
+		if concat, _ := jsonVal[[]interface{}](val, "concat"); concat != nil {
+			vals := make([]string, len(concat))
+			for i := range concat {
+				if str, ok := concat[i].(string); ok {
+					vals[i] = str
+				} else if num, ok := concat[i].(float64); ok {
+					vals[i] = fmt.Sprintf("%d", int(num))
+				} else {
+					return nil, fmt.Errorf("could not parse element value %q", concat[i])
+				}
+			}
+			return vals, nil
+		} else if len(val) == 1 {
+			var verdict string
+			// We just checked that len(val) == 1, so this loop body will only
+			// run once
+			for k, v := range val {
+				if v == nil {
+					verdict = k
+				} else if target, ok := v.(map[string]interface{}); ok {
+					verdict = fmt.Sprintf("%s %s", k, target["target"])
+				}
+			}
+			return []string{verdict}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("could not parse element value %q", json)
 }
 
 var commentRegexp = regexp.MustCompile(`^(.*) comment "([^"]*)"$`)
@@ -429,21 +487,4 @@ func splitComment(line string) (string, *string) {
 		return match[1], &match[2]
 	}
 	return line, nil
-}
-
-var mapValueRegexp = regexp.MustCompile(`^(([^"]|"[^"]*")+) : (([^"]|"[^"]*")+)`)
-
-// splitMapValue splits line into key, optional comment, and value, dealing with the
-// possibility of strings whose contents look like nftables syntax.
-func splitMapValue(line string) (string, *string, string) {
-	// We could perhaps do this more efficiently without using a regexp, but it would
-	// be more complicated...
-	match := mapValueRegexp.FindStringSubmatch(line)
-	if match == nil {
-		return "", nil, ""
-	}
-
-	value := match[3]
-	key, comment := splitComment(match[1])
-	return key, comment, value
 }

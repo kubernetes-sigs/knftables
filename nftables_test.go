@@ -262,99 +262,6 @@ func Test_splitComment(t *testing.T) {
 	}
 }
 
-func Test_splitMapValue(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		line    string
-		key     string
-		comment *string
-		value   string
-	}{
-		{
-			name:    "empty (bad)",
-			line:    "",
-			key:     "",
-			comment: nil,
-			value:   "",
-		},
-		{
-			name:    "simple",
-			line:    "192.168.0.1 . tcp . 80 : drop",
-			key:     "192.168.0.1 . tcp . 80",
-			comment: nil,
-			value:   "drop",
-		},
-		{
-			name:    "with comment",
-			line:    `192.168.0.1 . tcp . 80 comment "hello" : drop`,
-			key:     "192.168.0.1 . tcp . 80",
-			comment: Optional("hello"),
-			value:   "drop",
-		},
-		{
-			name:    "tricky comment #1",
-			line:    `192.168.0.1 . tcp . 80 comment " : " : drop`,
-			key:     "192.168.0.1 . tcp . 80",
-			comment: Optional(" : "),
-			value:   "drop",
-		},
-		{
-			name:    "tricky comment #2",
-			line:    `192.168.0.1 . tcp . 80 comment " no comment " : drop`,
-			key:     "192.168.0.1 . tcp . 80",
-			comment: Optional(" no comment "),
-			value:   "drop",
-		},
-		{
-			name:    "tricky key",
-			line:    `192.168.0.1 . " comment " . 80 : drop`,
-			key:     `192.168.0.1 . " comment " . 80`,
-			comment: nil,
-			value:   "drop",
-		},
-		{
-			name:    "tricky key with comment",
-			line:    `192.168.0.1 . " comment " . 80 comment "weird" : drop`,
-			key:     `192.168.0.1 . " comment " . 80`,
-			comment: Optional("weird"),
-			value:   "drop",
-		},
-		{
-			name:    "tricky value #1",
-			line:    `192.168.0.1 . tcp . 80 : " comment "`,
-			key:     `192.168.0.1 . tcp . 80`,
-			comment: nil,
-			value:   `" comment "`,
-		},
-		{
-			name:    "tricky value #2",
-			line:    `192.168.0.1 . tcp . 80 : " : drop "`,
-			key:     `192.168.0.1 . tcp . 80`,
-			comment: nil,
-			value:   `" : drop "`,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			key, comment, value := splitMapValue(tc.line)
-			if key != tc.key {
-				t.Errorf("bad key: expected %q got %q", tc.key, key)
-			}
-			if value != tc.value {
-				t.Errorf("bad value: expected %q got %q", tc.value, value)
-			}
-			if comment == nil {
-				if tc.comment != nil {
-					t.Errorf("bad comment: expected %q got nil", *tc.comment)
-				}
-			} else if tc.comment == nil {
-				t.Errorf("bad comment: expected nil got %q", *comment)
-			} else if *comment != *tc.comment {
-				t.Errorf("bad comment: expected %q got %q", *tc.comment, *comment)
-			}
-		})
-	}
-}
-
 func TestListRules(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
@@ -475,104 +382,95 @@ func TestListElements(t *testing.T) {
 			nftError:   "Error: No such file or directory\nlist set ip testing test\n                    ^^^^\n",
 		},
 		{
-			name:       "no output",
+			name:       "no elements",
 			objectType: "set",
-			nftOutput:  ``,
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": "inet_proto", "handle": 16}}]}`,
 			listOutput: []*Element{},
 		},
 		{
 			name:       "no elements",
 			objectType: "set",
-			nftOutput: `
-				table ip testing {
-					set test {
-						type ipv4_addr . inet_proto . inet_service
-						elements = {}
-					}
-				}`,
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": "inet_proto", "handle": 16, "elem": []}}]}`,
 			listOutput: []*Element{},
 		},
 		{
-			name:       "no elements",
+			name:       "simple type",
 			objectType: "set",
-			nftOutput: `
-				table ip testing {
-					set test {
-						type ipv4_addr . inet_proto . inet_service
-						elements = {
-						}
-					}
-				}`,
-			listOutput: []*Element{},
-		},
-		{
-			name:       "one element",
-			objectType: "map",
-			nftOutput: `
-				table ip testing {
-					map test {
-						type ipv4_addr . inet_proto . inet_service : verdict
-						elements = { 192.168.0.1 . tcp . 80 : goto chain1 }
-					}
-				}`,
-			listOutput: []*Element{
-				{
-					Map:   "test",
-					Key:   []string{"192.168.0.1", "tcp", "80"},
-					Value: []string{"goto chain1"},
-				},
-			},
-		},
-		{
-			name:       "two elements",
-			objectType: "map",
-			nftOutput: `
-				table ip testing {
-					map test {
-						type ipv4_addr . inet_proto . inet_service : verdict
-						elements = { 192.168.0.1 . tcp . 80 : goto chain1,
-						             192.168.0.2 . tcp . 443 comment "foo" : drop }
-					}
-				}`,
-			listOutput: []*Element{
-				{
-					Map:   "test",
-					Key:   []string{"192.168.0.1", "tcp", "80"},
-					Value: []string{"goto chain1"},
-				},
-				{
-					Map:     "test",
-					Key:     []string{"192.168.0.2", "tcp", "443"},
-					Comment: Optional("foo"),
-					Value:   []string{"drop"},
-				},
-			},
-		},
-		{
-			name:       "three elements",
-			objectType: "set",
-			nftOutput: `
-				table ip testing {
-					set test {
-						type ipv4_addr . inet_proto . inet_service
-						elements = { 192.168.0.1 . tcp . 80,
-						             192.168.0.3 . udp . 80,
-						             192.168.0.2 . tcp . 443 comment "foo" }
-					}
-				}`,
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": "ipv4_addr", "handle": 12, "elem": ["192.168.1.1", "192.168.1.2", {"elem": {"val": "192.168.1.3", "comment": "with a comment"}}]}}]}`,
 			listOutput: []*Element{
 				{
 					Set: "test",
-					Key: []string{"192.168.0.1", "tcp", "80"},
+					Key: []string{"192.168.1.1"},
 				},
 				{
 					Set: "test",
-					Key: []string{"192.168.0.3", "udp", "80"},
+					Key: []string{"192.168.1.2"},
 				},
 				{
 					Set:     "test",
-					Key:     []string{"192.168.0.2", "tcp", "443"},
+					Key:     []string{"192.168.1.3"},
+					Comment: Optional("with a comment"),
+				},
+			},
+		},
+		{
+			name:       "concatenated type",
+			objectType: "set",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": ["ipv4_addr", "inet_proto", "inet_service"], "handle": 13, "elem": [{"concat": ["192.168.1.3", "tcp", 80]}, {"concat": ["192.168.1.4", "udp", 80]}, {"elem": {"val": {"concat": ["192.168.1.5", "tcp", 443]}, "comment": "foo"}}]}}]}`,
+			listOutput: []*Element{
+				{
+					Set: "test",
+					Key: []string{"192.168.1.3", "tcp", "80"},
+				},
+				{
+					Set: "test",
+					Key: []string{"192.168.1.4", "udp", "80"},
+				},
+				{
+					Set:     "test",
+					Key:     []string{"192.168.1.5", "tcp", "443"},
 					Comment: Optional("foo"),
+				},
+			},
+		},
+		{
+			name:       "simple map",
+			objectType: "map",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"map": {"family": "ip", "name": "test", "table": "testing", "type": "ipv4_addr", "handle": 14, "map": "inet_service", "elem": [["10.0.0.1", 80], [{"elem": {"val": "10.0.0.2", "comment": "a comment"}}, 443]]}}]}`,
+			listOutput: []*Element{
+				{
+					Map:   "test",
+					Key:   []string{"10.0.0.1"},
+					Value: []string{"80"},
+				},
+				{
+					Map:     "test",
+					Key:     []string{"10.0.0.2"},
+					Value:   []string{"443"},
+					Comment: Optional("a comment"),
+				},
+			},
+		},
+		{
+			name:       "verdict map, concatenated key",
+			objectType: "map",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"map": {"family": "ip", "name": "test", "table": "testing", "type": ["ipv4_addr", "inet_proto"], "handle": 15, "map": "verdict", "elem": [[{"concat": ["192.168.1.1", "tcp"]}, {"drop": null}], [{"elem": {"val": {"concat": ["192.168.1.3", "tcp"]}, "comment": "foo"}}, {"return": null}], [{"concat": ["192.168.1.2", "udp"]}, {"goto": {"target": "test"}}]]}}]}`,
+			listOutput: []*Element{
+				{
+					Map:   "test",
+					Key:   []string{"192.168.1.1", "tcp"},
+					Value: []string{"drop"},
+				},
+				{
+					Map:     "test",
+					Key:     []string{"192.168.1.3", "tcp"},
+					Value:   []string{"return"},
+					Comment: Optional("foo"),
+				},
+				{
+					Map:   "test",
+					Key:   []string{"192.168.1.2", "udp"},
+					Value: []string{"goto test"},
 				},
 			},
 		},
@@ -585,7 +483,7 @@ func TestListElements(t *testing.T) {
 			}
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "list", tc.objectType, "ip", "testing", "test"},
+					args:   []string{"nft", "--json", "list", tc.objectType, "ip", "testing", "test"},
 					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
 					err:    err,
 				},
