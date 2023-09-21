@@ -35,8 +35,9 @@ IPv6.
 
 You can use the `List`, `ListRules`, and `ListElements` methods on the
 `Interface` to check if objects exist. `List` returns the names of
-`"chains"`, `"sets"`, or `"maps"` in the table, while `ListRules` and
-`ListElements` return `Rule` and `Element` objects.
+`"chains"`, `"sets"`, or `"maps"` in the table, while `ListElements`
+returns `Element` objects and `ListRules` returns *partial* `Rule`
+objects.
 
 ```golang
 chains, err := nft.List(ctx, "chains")
@@ -165,28 +166,19 @@ versions of `nft` is not currently supported because it would be
 unexpectedly heavyweight to emulate on systems that don't have it, so
 it is better (for now) to force callers to implement it by hand.
 
+`ListRules` returns `Rule` objects without the `Rule` field filled in,
+because it uses the JSON API to list the rules, but there is no easy
+way to convert the JSON rule representation back into plaintext form.
+This means that it is only useful when either (a) you know the order
+of the rules in the chain, but want to know their handles, or (b) you
+can recognize the rules you are looking for by their comments, rather
+than the rule bodies.
+
 # Design Notes
 
-The library works by invoking the `nft` binary, mostly not using the
-`--json` mode.
-
-Although it might seem like we ought to use either the low-level
-(netlink) interface, or at least the JSON interface, that doesn't seem
-like a good idea in practice. The documented syntax of nftables rules
-and set/map elements is implemented by the higher-level APIs, so if we
-used the lower-level APIs (or the JSON API, which wraps the
-lower-level APIs), then the official nftables documentation would be
-mostly useless to people using this library. (You would essentially be
-forced to do `nft add rule ...; nft -j list chain ...` to figure out
-the JSON syntax for the rules you wanted so you could then write it in
-the form the library needed.)
-
-Using the non-JSON syntax has its own problems, and means that it is
-basically impossible for us to reliably parse the actual "rule" part
-of rules. (We can reliably parse the output of `"nft list chain"` into
-`Rule` objects, including distinguishing any `comment` from the rule
-itself, but we don't have any ability to split the rule up into
-individual clauses.)
+The library works by invoking the `nft` binary. "Write" operations are
+implemented with the ordinary plain-text API, while "read" operations
+are implemented with the JSON API, for parseability.
 
 The fact that the API uses functions and objects (e.g.
 `tx.Add(&nftables.Chain{...})`) rather than just specifying everything
