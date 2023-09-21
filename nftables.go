@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"strconv"
-	"strings"
 )
 
 // Interface is an interface for running nftables commands against a given family and table.
@@ -49,7 +47,11 @@ type Interface interface {
 	// list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
-	// ListRules returns a list of the rules in a chain. If the chain exists but
+	// ListRules returns a list of the rules in a chain, in order. Note that at the
+	// present time, the Rule objects will have their `Comment` and `Handle` fields
+	// filled in, but *not* the actual `Rule` field. So this can only be used to find
+	// the handles of rules if they have unique comments to recognize them by, or if
+	// you know the order of the rules within the chain. If the chain exists but
 	// contains no rules, this will return an empty list and no error.
 	ListRules(ctx context.Context, chain string) ([]*Rule, error)
 
@@ -271,69 +273,32 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 // ListRules is part of Interface
 func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
-	// We don't use the JSON API because the syntax for rules is wildly different in
-	// JSON and there is no way to convert it to "normal" form.
-	cmd := exec.CommandContext(ctx, "nft", "--handle", "list", "chain", string(nft.family), nft.table, chain)
+	cmd := exec.CommandContext(ctx, "nft", "--json", "list", "chain", string(nft.family), nft.table, chain)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
-	// Output looks like:
-	//
-	// table inet firewalld { # handle 1
-	//     chain filter_INPUT { # handle 165
-	//         type filter hook input priority filter + 10; policy accept;
-	//         ct state { established, related } accept # handle 169
-	//         ct status dnat accept # handle 170
-	//         iifname "lo" accept # handle 171
-	//         ...
-	//     }
-	// }
-	//
-	// (Where the "type ..." line only appears for base chains.) If a rule has a
-	// comment, it will always be the last part of the rule (before the handle).
-
-	lines := strings.Split(out, "\n")
-	rules := make([]*Rule, 0, len(lines))
-	sawTable := false
-	sawChain := false
-	for _, line := range lines {
-		line := strings.TrimSpace(line)
-
-		if !sawTable {
-			if strings.HasPrefix(line, "table ") {
-				sawTable = true
-			}
-			continue
-		} else if !sawChain {
-			if strings.HasPrefix(line, "chain "+chain) {
-				sawChain = true
-			}
-			continue
-		} else if line == "}" {
-			break
-		}
-
-		parts := strings.Split(line, " # handle ")
-		if len(parts) != 2 {
-			continue
-		}
-		line, handleStr := parts[0], parts[1]
-		handle, err := strconv.Atoi(handleStr)
-		if err != nil {
-			continue
-		}
-
-		rule, comment := splitComment(line)
-		rules = append(rules, &Rule{
-			Chain:   chain,
-			Rule:    rule,
-			Comment: comment,
-			Handle:  &handle,
-		})
+	jsonRules, err := getJSONObjects(out, "rule")
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse JSON output: %w", err)
 	}
 
+	rules := make([]*Rule, 0, len(jsonRules))
+	for _, jsonRule := range jsonRules {
+		rule := &Rule{
+			Chain: chain,
+		}
+
+		if handle, ok := jsonVal[float64](jsonRule, "handle"); ok {
+			rule.Handle = Optional(int(handle))
+		}
+		if comment, ok := jsonVal[string](jsonRule, "comment"); ok {
+			rule.Comment = &comment
+		}
+
+		rules = append(rules, rule)
+	}
 	return rules, nil
 }
 

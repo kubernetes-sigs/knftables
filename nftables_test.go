@@ -274,61 +274,25 @@ func TestListRules(t *testing.T) {
 			nftError: "Error: No such file or directory\nlist chain ip testing testchain\n                      ^^^^^^^^^\n",
 		},
 		{
-			name:       "no output",
-			nftOutput:  ``,
-			listOutput: []*Rule{},
-		},
-		{
 			name: "no rules",
-			nftOutput: `
-				table ip testing { # handle 1
-					chain testchain { # handle 165
-					}
-				}`,
-			listOutput: []*Rule{},
-		},
-		{
-			name: "no rules",
-			nftOutput: `
-				table ip testing { # handle 1
-					chain testchain { # handle 165
-						# this line is a comment, and the next is not a rule
-						type filter hook input priority filter + 10; policy accept;
-						# no handle; shouldn't happen, but should be ignored
-						ip daddr 10.0.0.1
-						# bad handle; shouldn't happen, but should be ignored
-						ip daddr 10.0.0.1 # handle bob
-					}
-				}`,
+			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"chain": {"family": "ip", "table": "testing", "name": "testchain", "handle": 21}}]}`,
 			listOutput: []*Rule{},
 		},
 		{
 			name: "normal output",
-			nftOutput: `
-				table ip testing { # handle 1
-				  yeah I don't think nftables ever actually outputs random extra lines like this but maybe?
-					chain testchain { # handle 165
-						type filter hook input priority filter + 10; policy accept;
-						ct state { established, related } accept # handle 169
-						ct status dnat accept comment "This rule does something" # handle 170
-						iifname "lo" accept # handle 171
-					}
-				}`,
+			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"chain": {"family": "ip", "table": "testing", "name": "testchain", "handle": 165}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 169, "expr": [{"match": {"op": "==", "left": {"ct": {"key": "state"}}, "right": {"set": ["established", "related"]}}}, {"accept": null}]}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 170, "comment": "This rule does something", "expr": [{"match": {"op": "in", "left": {"ct": {"key": "status"}}, "right": "dnat"}}, {"accept": null}]}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 171, "expr": [{"match": {"op": "==", "left": {"meta": {"key": "iifname"}}, "right": "lo"}}, {"accept": null}]}}]}`,
 			listOutput: []*Rule{
 				{
 					Chain:  "testchain",
-					Rule:   "ct state { established, related } accept",
 					Handle: Optional(169),
 				},
 				{
 					Chain:   "testchain",
-					Rule:    "ct status dnat accept",
 					Comment: Optional("This rule does something"),
 					Handle:  Optional(170),
 				},
 				{
 					Chain:  "testchain",
-					Rule:   `iifname "lo" accept`,
 					Handle: Optional(171),
 				},
 			},
@@ -342,7 +306,7 @@ func TestListRules(t *testing.T) {
 			}
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "--handle", "list", "chain", "ip", "testing", "testchain"},
+					args:   []string{"nft", "--json", "list", "chain", "ip", "testing", "testchain"},
 					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
 					err:    err,
 				},
