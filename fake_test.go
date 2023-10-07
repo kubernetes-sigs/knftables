@@ -75,9 +75,10 @@ func TestFakeRun(t *testing.T) {
 		Value: "goto chain",
 	})
 	tx.Add(&Element{
-		Name:  "map1",
-		Key:   Join("192.168.0.2", "tcp", "443"),
-		Value: "goto anotherchain",
+		Name:    "map1",
+		Key:     Join("192.168.0.2", "tcp", "443"),
+		Value:   "goto anotherchain",
+		Comment: Optional("with a comment"),
 	})
 	// Duplicate element
 	tx.Add(&Element{
@@ -152,7 +153,7 @@ func TestFakeRun(t *testing.T) {
 		add rule ip kube-proxy chain masquerade comment "comment"
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
-		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 : goto anotherchain }
+		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
 	dump := fake.Dump()
 	if dump != expected {
@@ -186,7 +187,7 @@ func TestFakeRun(t *testing.T) {
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
-		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 : goto anotherchain }
+		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
 	dump = fake.Dump()
 	if dump != expected {

@@ -334,12 +334,12 @@ func (element *Element) validate(verb verb) error {
 func (element *Element) writeOperation(verb verb, family Family, table string, writer io.Writer) {
 	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, family, table, element.Name, element.Key)
 
-	if element.Value != "" {
-		fmt.Fprintf(writer, " : %s", element.Value)
-	}
-
 	if (verb == addVerb || verb == createVerb) && element.Comment != nil {
 		fmt.Fprintf(writer, " comment %q", *element.Comment)
+	}
+
+	if element.Value != "" {
+		fmt.Fprintf(writer, " : %s", element.Value)
 	}
 
 	fmt.Fprintf(writer, " }\n")
