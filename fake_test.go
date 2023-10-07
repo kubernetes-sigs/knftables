@@ -70,19 +70,19 @@ func TestFakeRun(t *testing.T) {
 		Type: "ipv4_addr . inet_proto . inet_service : verdict",
 	})
 	tx.Add(&Element{
-		Name:  "map1",
+		Map:   "map1",
 		Key:   []string{"192.168.0.1", "tcp", "80"},
 		Value: []string{"goto chain"},
 	})
 	tx.Add(&Element{
-		Name:    "map1",
+		Map:     "map1",
 		Key:     []string{"192.168.0.2", "tcp", "443"},
 		Value:   []string{"goto anotherchain"},
 		Comment: Optional("with a comment"),
 	})
 	// Duplicate element
 	tx.Add(&Element{
-		Name:  "map1",
+		Map:   "map1",
 		Key:   []string{"192.168.0.1", "tcp", "80"},
 		Value: []string{"drop"},
 	})

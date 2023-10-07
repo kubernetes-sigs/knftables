@@ -316,15 +316,25 @@ func (mapObj *Map) writeOperation(verb verb, family Family, table string, writer
 
 // Object implementation for Element
 func (element *Element) validate(verb verb) error {
-	if element.Name == "" {
+	if element.Map == "" && element.Set == "" {
 		return fmt.Errorf("no set/map name specified for element")
+	} else if element.Set != "" && element.Map != "" {
+		return fmt.Errorf("element specifies both a set name and a map name")
 	}
+
 	if len(element.Key) == 0 {
 		return fmt.Errorf("no key specified for element")
 	}
+	if element.Set != "" && len(element.Value) != 0 {
+		return fmt.Errorf("map value specified for set element")
+	}
 
 	switch verb {
-	case addVerb, createVerb, deleteVerb:
+	case addVerb, createVerb:
+		if element.Map != "" && len(element.Value) == 0 {
+			return fmt.Errorf("no map value specified for map element")
+		}
+	case deleteVerb:
 	default:
 		return fmt.Errorf("%s is not implemented for elements", verb)
 	}
@@ -333,15 +343,22 @@ func (element *Element) validate(verb verb) error {
 }
 
 func (element *Element) writeOperation(verb verb, family Family, table string, writer io.Writer) {
-	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, family, table, element.Name,
-		strings.Join(element.Key, " . "))
-
-	if (verb == addVerb || verb == createVerb) && element.Comment != nil {
-		fmt.Fprintf(writer, " comment %q", *element.Comment)
+	name := element.Set
+	if len(element.Value) != 0 {
+		name = element.Map
 	}
 
-	if len(element.Value) != 0 {
-		fmt.Fprintf(writer, " : %s", strings.Join(element.Value, " . "))
+	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, family, table, name,
+		strings.Join(element.Key, " . "))
+
+	if verb == addVerb || verb == createVerb {
+		if element.Comment != nil {
+			fmt.Fprintf(writer, " comment %q", *element.Comment)
+		}
+
+		if len(element.Value) != 0 {
+			fmt.Fprintf(writer, " : %s", strings.Join(element.Value, " . "))
+		}
 	}
 
 	fmt.Fprintf(writer, " }\n")

@@ -342,9 +342,9 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			}
 		case *Element:
 			if len(obj.Value) == 0 {
-				existingSet := fake.Table.Sets[obj.Name]
+				existingSet := fake.Table.Sets[obj.Set]
 				if existingSet == nil {
-					return notFoundError("no such set %q", obj.Name)
+					return notFoundError("no such set %q", obj.Set)
 				}
 				switch op.verb {
 				case addVerb, createVerb:
@@ -374,9 +374,9 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					return fmt.Errorf("unhandled operation %q", op.verb)
 				}
 			} else {
-				existingMap := fake.Table.Maps[obj.Name]
+				existingMap := fake.Table.Maps[obj.Map]
 				if existingMap == nil {
-					return notFoundError("no such map %q", obj.Name)
+					return notFoundError("no such map %q", obj.Map)
 				}
 				switch op.verb {
 				case addVerb, createVerb:

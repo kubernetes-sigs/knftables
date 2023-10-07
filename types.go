@@ -309,8 +309,13 @@ type Map struct {
 
 // Element represents a set or map element
 type Element struct {
-	// Name is the name of the element's set or map.
-	Name string
+	// Set is the name of the set that contains this element (or the empty string if
+	// this is a map element.)
+	Set string
+
+	// Map is the name of the map that contains this element (or the empty string if
+	// this is a set element.)
+	Map string
 
 	// Key is the element key. (The list contains a single element for "simple" keys,
 	// or multiple elements for concatenations.)
