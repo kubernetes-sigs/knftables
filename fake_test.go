@@ -257,7 +257,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	assertRules(t, fake, /* no rules */)
+	assertRules(t, fake /* no rules */)
 
 	// Test basic Add
 	tx = NewTransaction()
