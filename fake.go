@@ -26,9 +26,8 @@ import (
 
 // Fake is a fake implementation of Interface
 type Fake struct {
-	family  Family
-	table   string
-	defines []define
+	family Family
+	table  string
 
 	nextHandle int
 
@@ -80,9 +79,8 @@ type FakeMap struct {
 // NewFake creates a new fake Interface, for unit tests
 func NewFake(family Family, table string) *Fake {
 	return &Fake{
-		family:  family,
-		table:   table,
-		defines: defaultDefinesForFamily(family),
+		family: family,
+		table:  table,
 	}
 }
 
@@ -151,18 +149,6 @@ func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]
 		}
 	}
 	return nil, notFoundError("no such %s %q", objectType, name)
-}
-
-// Define is part of Interface
-func (fake *Fake) Define(name, value string) {
-	fake.defines = append(fake.defines, define{name, value})
-}
-
-func substituteDefines(val string, defines []define) string {
-	for _, def := range defines {
-		val = strings.ReplaceAll(val, "$"+def.name, def.value)
-	}
-	return val
 }
 
 // Run is part of Interface
@@ -253,7 +239,6 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			}
 
 			rule := *obj
-			rule.Rule = substituteDefines(rule.Rule, fake.defines)
 			refRule := -1
 			if rule.Handle != nil {
 				refRule = findRule(existingChain.Rules, *obj.Handle)
@@ -300,8 +285,6 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				set := *obj
-				set.Type = substituteDefines(set.Type, fake.defines)
-				set.TypeOf = substituteDefines(set.TypeOf, fake.defines)
 				set.Handle = Optional(fake.nextHandle)
 				fake.Table.Sets[obj.Name] = &FakeSet{
 					Set: set,
@@ -326,8 +309,6 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				mapObj := *obj
-				mapObj.Type = substituteDefines(mapObj.Type, fake.defines)
-				mapObj.TypeOf = substituteDefines(mapObj.TypeOf, fake.defines)
 				mapObj.Handle = Optional(fake.nextHandle)
 				fake.Table.Maps[obj.Name] = &FakeMap{
 					Map: mapObj,
@@ -349,9 +330,6 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				switch op.verb {
 				case addVerb, createVerb:
 					element := *obj
-					for i := range element.Key {
-						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
-					}
 					if i := findElement(existingSet.Elements, element.Key); i != -1 {
 						if op.verb == createVerb {
 							return existsError("element %q already exists", strings.Join(element.Key, " . "))
@@ -362,9 +340,6 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					}
 				case deleteVerb:
 					element := *obj
-					for i := range element.Key {
-						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
-					}
 					if i := findElement(existingSet.Elements, element.Key); i != -1 {
 						existingSet.Elements = append(existingSet.Elements[:i], existingSet.Elements[i+1:]...)
 					} else {
@@ -381,12 +356,6 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				switch op.verb {
 				case addVerb, createVerb:
 					element := *obj
-					for i := range element.Key {
-						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
-					}
-					for i := range element.Value {
-						element.Value[i] = substituteDefines(element.Value[i], fake.defines)
-					}
 					if i := findElement(existingMap.Elements, element.Key); i != -1 {
 						if op.verb == createVerb {
 							return existsError("element %q already exists", strings.Join(element.Key, ". "))
@@ -397,9 +366,6 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					}
 				case deleteVerb:
 					element := *obj
-					for i := range element.Key {
-						element.Key[i] = substituteDefines(element.Key[i], fake.defines)
-					}
 					if i := findElement(existingMap.Elements, element.Key); i != -1 {
 						existingMap.Elements = append(existingMap.Elements[:i], existingMap.Elements[i+1:]...)
 					} else {

@@ -167,17 +167,17 @@ func TestRun(t *testing.T) {
 	})
 	tx.Add(&Rule{
 		Chain: "chain",
-		Rule:  "$IP daddr 10.0.0.0/8 drop",
+		Rule:  "ip daddr 10.0.0.0/8 drop",
 	})
 
 	expected := strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
 		add chain ip kube-proxy chain { comment "foo" ; }
-		add rule ip kube-proxy chain $IP daddr 10.0.0.0/8 drop
+		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
 		`), "\n")
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
-			args:  []string{"nft", "-D", "IP=ip", "-D", "INET_ADDR=ipv4_addr", "-f", "-"},
+			args:  []string{"nft", "-f", "-"},
 			stdin: expected,
 		},
 	)

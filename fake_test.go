@@ -43,7 +43,7 @@ func TestFakeRun(t *testing.T) {
 	})
 	tx.Add(&Rule{
 		Chain: "chain",
-		Rule:  "$IP daddr 10.0.0.0/8 drop",
+		Rule:  "ip daddr 10.0.0.0/8 drop",
 	})
 	tx.Add(&Rule{
 		Chain:   "chain",
@@ -56,12 +56,12 @@ func TestFakeRun(t *testing.T) {
 	})
 	tx.Add(&Rule{
 		Chain:   "anotherchain",
-		Rule:    "$IP saddr 1.2.3.4 drop",
+		Rule:    "ip saddr 1.2.3.4 drop",
 		Comment: Optional("drop rule"),
 	})
 	tx.Add(&Rule{
 		Chain:   "anotherchain",
-		Rule:    "$IP daddr 5.6.7.8 reject",
+		Rule:    "ip daddr 5.6.7.8 reject",
 		Comment: Optional("reject rule"),
 	})
 

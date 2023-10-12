@@ -25,14 +25,6 @@ if err := nft.Present(); err != nil {
 }
 ```
 
-The `Define` method can be used to add defines (as with `nft -D
-name=value`) to an `Interface` which can then be referenced with
-`$name` in transactions. If you are using `IPv4Family` or `IPv6Family`
-then you automatically get the defines `IP` (`"ip"` or `"ip6"`) and
-`INET_ADDR` (`"ipv4_addr"` or `"ipv6_addr"`) which can be used to
-allow the same rules and set/map definitions to be used for IPv4 and
-IPv6.
-
 You can use the `List`, `ListRules`, and `ListElements` methods on the
 `Interface` to check if objects exist. `List` returns the names of
 `"chains"`, `"sets"`, or `"maps"` in the table, while `ListElements`
@@ -75,8 +67,8 @@ var destPort uint16
 tx.Add(&nftables.Rule{
         Chain: "mychain",
         Rule:  nftables.Concat(
-                "$IP daddr", destIP,
-                "$IP protocol", "tcp",
+                "ip daddr", destIP,
+                "ip protocol", "tcp",
                 "th port", destPort,
                 "jump", destChain,
         )
