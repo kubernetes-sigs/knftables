@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func getObjType(object Object) string {
@@ -28,7 +29,7 @@ func getObjType(object Object) string {
 	return parts[len(parts)-1]
 }
 
-func Test_validate(t *testing.T) {
+func TestObjects(t *testing.T) {
 	tested := make(map[string]map[verb]struct{})
 
 	for _, tc := range []struct {
@@ -36,37 +37,44 @@ func Test_validate(t *testing.T) {
 		verb   verb
 		object Object
 		err    string
+		out    string
 	}{
 		// Tables
 		{
 			name:   "add table",
 			verb:   addVerb,
 			object: &Table{},
+			out:    `add table ip mytable`,
 		},
 		{
 			name:   "add table with comment",
 			verb:   addVerb,
 			object: &Table{Comment: Optional("foo")},
+			out:    `add table ip mytable { comment "foo" ; }`,
 		},
 		{
 			name:   "create table",
 			verb:   createVerb,
 			object: &Table{},
+			out:    `create table ip mytable`,
 		},
 		{
 			name:   "flush table",
 			verb:   flushVerb,
 			object: &Table{},
+			out:    `flush table ip mytable`,
 		},
 		{
 			name:   "delete table",
 			verb:   deleteVerb,
 			object: &Table{},
+			out:    `delete table ip mytable`,
 		},
 		{
 			name:   "delete table by handle",
 			verb:   deleteVerb,
 			object: &Table{Handle: Optional(5)},
+			out:    `delete table ip handle 5`,
 		},
 		{
 			name:   "invalid insert table",
@@ -92,46 +100,55 @@ func Test_validate(t *testing.T) {
 			name:   "add chain",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain"},
+			out:    `add chain ip mytable mychain`,
 		},
 		{
 			name:   "add chain with comment",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Comment: Optional("foo")},
+			out:    `add chain ip mytable mychain { comment "foo" ; }`,
 		},
 		{
 			name:   "add base chain",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority)},
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; }`,
 		},
 		{
 			name:   "add base chain with comment",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority), Comment: Optional("foo")},
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; comment "foo" ; }`,
 		},
 		{
 			name:   "create chain",
 			verb:   createVerb,
 			object: &Chain{Name: "mychain"},
+			out:    `create chain ip mytable mychain`,
 		},
 		{
 			name:   "flush chain",
 			verb:   flushVerb,
 			object: &Chain{Name: "mychain"},
+			out:    `flush chain ip mytable mychain`,
 		},
 		{
 			name:   "delete chain",
 			verb:   deleteVerb,
 			object: &Chain{Name: "mychain"},
+			out:    `delete chain ip mytable mychain`,
 		},
 		{
 			name:   "delete chain by handle",
 			verb:   deleteVerb,
 			object: &Chain{Name: "mychain", Handle: Optional(5)},
+			out:    `delete chain ip mytable handle 5`,
 		},
 		{
 			name:   "delete chain by handle (without name)",
 			verb:   deleteVerb,
 			object: &Chain{Handle: Optional(5)},
+			out:    `delete chain ip mytable handle 5`,
 		},
 		{
 			name:   "invalid insert chain",
@@ -199,46 +216,55 @@ func Test_validate(t *testing.T) {
 			name:   "add rule",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop"},
+			out:    `add rule ip mytable mychain drop`,
 		},
 		{
 			name:   "add rule with comment",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Comment: Optional("comment")},
+			out:    `add rule ip mytable mychain drop comment "comment"`,
 		},
 		{
 			name:   "add rule relative to index",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Index: Optional(2)},
+			out:    `add rule ip mytable mychain index 2 drop`,
 		},
 		{
 			name:   "add rule relative to handle",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Handle: Optional(2)},
+			out:    `add rule ip mytable mychain handle 2 drop`,
 		},
 		{
 			name:   "insert rule",
 			verb:   insertVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop"},
+			out:    `insert rule ip mytable mychain drop`,
 		},
 		{
 			name:   "insert rule with comment relative to handle",
 			verb:   insertVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Comment: Optional("comment"), Handle: Optional(2)},
+			out:    `insert rule ip mytable mychain handle 2 drop comment "comment"`,
 		},
 		{
 			name:   "replace rule",
 			verb:   replaceVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Handle: Optional(2)},
+			out:    `replace rule ip mytable mychain handle 2 drop`,
 		},
 		{
 			name:   "delete rule",
 			verb:   deleteVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Handle: Optional(2)},
+			out:    `delete rule ip mytable mychain handle 2`,
 		},
 		{
 			name:   "delete rule without Rule",
 			verb:   deleteVerb,
 			object: &Rule{Chain: "mychain", Handle: Optional(2)},
+			out:    `delete rule ip mytable mychain handle 2`,
 		},
 		{
 			name:   "invalid create rule",
@@ -288,41 +314,65 @@ func Test_validate(t *testing.T) {
 			name:   "add set",
 			verb:   addVerb,
 			object: &Set{Name: "myset", Type: "ipv4_addr"},
+			out:    `add set ip mytable myset { type ipv4_addr ; }`,
 		},
 		{
 			name:   "add set with TypeOf",
 			verb:   addVerb,
-			object: &Set{Name: "myset", TypeOf: "ip addr"},
+			object: &Set{Name: "myset", TypeOf: "ip saddr"},
+			out:    `add set ip mytable myset { typeof ip saddr ; }`,
+		},
+		{
+			name: "add set with all properties",
+			verb: addVerb,
+			object: &Set{
+				Name:       "myset",
+				Type:       "ipv4_addr",
+				Flags:      []SetFlag{DynamicFlag, IntervalFlag},
+				Timeout:    Optional(3 * time.Minute),
+				GCInterval: Optional(time.Hour),
+				Size:       Optional[uint64](1000),
+				Policy:     Optional(PerformancePolicy),
+				AutoMerge:  Optional(true),
+				Comment:    Optional("that's a lot of options"),
+			},
+			out: `add set ip mytable myset { type ipv4_addr ; flags dynamic,interval ; timeout 180s ; gc-interval 3600s ; size 1000 ; policy performance ; auto-merge ; comment "that's a lot of options" ; }`,
 		},
 		{
 			name:   "create set",
 			verb:   createVerb,
 			object: &Set{Name: "myset", Type: "ipv4_addr"},
+			out:    `create set ip mytable myset { type ipv4_addr ; }`,
 		},
 		{
 			name:   "flush set",
 			verb:   flushVerb,
 			object: &Set{Name: "myset"},
+			out:    `flush set ip mytable myset`,
 		},
 		{
 			name:   "flush set with extraneous Type",
 			verb:   flushVerb,
 			object: &Set{Name: "myset", Type: "ipv4_addr"},
+			out:    `flush set ip mytable myset`,
 		},
 		{
 			name:   "delete set",
 			verb:   deleteVerb,
 			object: &Set{Name: "myset"},
+			out:    `delete set ip mytable myset`,
 		},
 		{
 			name:   "delete set by handle",
 			verb:   deleteVerb,
 			object: &Set{Name: "myset", Handle: Optional(5)},
+			out:    `delete set ip mytable handle 5`,
 		},
 		{
 			name:   "delete set by handle without Name",
 			verb:   deleteVerb,
 			object: &Set{Handle: Optional(5)},
+			out:    `delete set ip mytable handle 5`,
 		},
 		{
 			name:   "invalid insert set",
@@ -366,41 +416,64 @@ func Test_validate(t *testing.T) {
 			name:   "add map",
 			verb:   addVerb,
 			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+			out:    `add map ip mytable mymap { type ipv4_addr : ipv4_addr ; }`,
 		},
 		{
 			name:   "add map with TypeOf",
 			verb:   addVerb,
-			object: &Map{Name: "mymap", TypeOf: "ip addr : ip addr"},
+			object: &Map{Name: "mymap", TypeOf: "ip saddr : ip saddr"},
+			out:    `add map ip mytable mymap { typeof ip saddr : ip saddr ; }`,
+		},
+		{
+			name: "add map with all properties",
+			verb: addVerb,
+			object: &Map{
+				Name:       "mymap",
+				Type:       "ipv4_addr : ipv4_addr",
+				Flags:      []SetFlag{DynamicFlag, IntervalFlag},
+				Timeout:    Optional(3 * time.Minute),
+				GCInterval: Optional(time.Hour),
+				Size:       Optional[uint64](1000),
+				Policy:     Optional(PerformancePolicy),
+				Comment:    Optional("that's a lot of options"),
+			},
+			out: `add map ip mytable mymap { type ipv4_addr : ipv4_addr ; flags dynamic,interval ; timeout 180s ; gc-interval 3600s ; size 1000 ; policy performance ; comment "that's a lot of options" ; }`,
 		},
 		{
 			name:   "create map",
 			verb:   createVerb,
 			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+			out:    `create map ip mytable mymap { type ipv4_addr : ipv4_addr ; }`,
 		},
 		{
 			name:   "flush map",
 			verb:   flushVerb,
 			object: &Map{Name: "mymap"},
+			out:    `flush map ip mytable mymap`,
 		},
 		{
 			name:   "flush map with extraneous Type",
 			verb:   flushVerb,
 			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+			out:    `flush map ip mytable mymap`,
 		},
 		{
 			name:   "delete map",
 			verb:   deleteVerb,
 			object: &Map{Name: "mymap"},
+			out:    `delete map ip mytable mymap`,
 		},
 		{
 			name:   "delete map by Handle",
 			verb:   deleteVerb,
 			object: &Map{Name: "mymap", Handle: Optional(5)},
+			out:    `delete map ip mytable handle 5`,
 		},
 		{
 			name:   "delete map by Handle without Name",
 			verb:   deleteVerb,
 			object: &Map{Handle: Optional(5)},
+			out:    `delete map ip mytable handle 5`,
 		},
 		{
 			name:   "invalid insert map",
@@ -444,31 +517,43 @@ func Test_validate(t *testing.T) {
 			name:   "add (set) element",
 			verb:   addVerb,
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
+			out:    `add element ip mytable myset { 10.0.0.1 }`,
 		},
 		{
 			name:   "add (map) element",
 			verb:   addVerb,
 			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}},
+			out:    `add element ip mytable mymap { 10.0.0.1 : 192.168.1.1 }`,
 		},
 		{
 			name:   "create (set) element with comment",
 			verb:   createVerb,
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}, Comment: Optional("comment")},
+			out:    `create element ip mytable myset { 10.0.0.1 comment "comment" }`,
+		},
+		{
+			name:   "create (map) element with comment",
+			verb:   addVerb,
+			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}, Comment: Optional("comment")},
+			out:    `add element ip mytable mymap { 10.0.0.1 comment "comment" : 192.168.1.1 }`,
 		},
 		{
 			name:   "delete (set) element",
 			verb:   deleteVerb,
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
+			out:    `delete element ip mytable myset { 10.0.0.1 }`,
 		},
 		{
 			name:   "delete (map) element with unnecessary Value",
 			verb:   deleteVerb,
 			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}},
+			out:    `delete element ip mytable mymap { 10.0.0.1 }`,
 		},
 		{
 			name:   "delete (map) element",
 			verb:   deleteVerb,
 			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}},
+			out:    `delete element ip mytable mymap { 10.0.0.1 }`,
 		},
 		{
 			name:   "invalid add element with no Set",
@@ -536,6 +621,15 @@ func Test_validate(t *testing.T) {
 				tested[objType] = make(map[verb]struct{})
 			}
 			tested[objType][tc.verb] = struct{}{}
+
+			if err == nil && tc.err == "" {
+				b := &strings.Builder{}
+				tc.object.writeOperation(tc.verb, IPv4Family, "mytable", b)
+				out := strings.TrimSuffix(b.String(), "\n")
+				if out != tc.out {
+					t.Errorf("expected %q but got %q", tc.out, out)
+				}
+			}
 		})
 	}
 

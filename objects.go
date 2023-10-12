@@ -212,10 +212,10 @@ func (set *Set) writeOperation(verb verb, family Family, table string, writer io
 		}
 
 		if set.Timeout != nil {
-			fmt.Fprintf(writer, " timeout %d ;", int64(set.Timeout.Seconds()))
+			fmt.Fprintf(writer, " timeout %ds ;", int64(set.Timeout.Seconds()))
 		}
 		if set.GCInterval != nil {
-			fmt.Fprintf(writer, " gc-interval %d ;", int64(set.GCInterval.Seconds()))
+			fmt.Fprintf(writer, " gc-interval %ds ;", int64(set.GCInterval.Seconds()))
 		}
 		if set.Size != nil {
 			fmt.Fprintf(writer, " size %d ;", *set.Size)
@@ -292,10 +292,10 @@ func (mapObj *Map) writeOperation(verb verb, family Family, table string, writer
 		}
 
 		if mapObj.Timeout != nil {
-			fmt.Fprintf(writer, " timeout %d ;", int64(mapObj.Timeout.Seconds()))
+			fmt.Fprintf(writer, " timeout %ds ;", int64(mapObj.Timeout.Seconds()))
 		}
 		if mapObj.GCInterval != nil {
-			fmt.Fprintf(writer, " gc-interval %d ;", int64(mapObj.GCInterval.Seconds()))
+			fmt.Fprintf(writer, " gc-interval %ds ;", int64(mapObj.GCInterval.Seconds()))
 		}
 		if mapObj.Size != nil {
 			fmt.Fprintf(writer, " size %d ;", *mapObj.Size)
@@ -344,7 +344,7 @@ func (element *Element) validate(verb verb) error {
 
 func (element *Element) writeOperation(verb verb, family Family, table string, writer io.Writer) {
 	name := element.Set
-	if len(element.Value) != 0 {
+	if name == "" {
 		name = element.Map
 	}
 
