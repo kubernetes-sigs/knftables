@@ -158,7 +158,7 @@ func TestList(t *testing.T) {
 func TestRun(t *testing.T) {
 	fexec := newFakeExec(t)
 	nft := newInternal(IPv4Family, "kube-proxy", fexec)
-	tx := NewTransaction()
+	tx := nft.NewTransaction()
 
 	tx.Add(&Table{})
 	tx.Add(&Chain{

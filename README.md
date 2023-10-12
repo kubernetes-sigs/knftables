@@ -51,7 +51,7 @@ To make changes, create a `Transaction`, add the appropriate
 operations to the transaction, and then call `nft.Run` on it:
 
 ```golang
-tx := nftables.NewTransaction()
+tx := nft.NewTransaction()
 
 tx.Add(&nftables.Chain{
         Name:    "mychain",

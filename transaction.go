@@ -23,6 +23,8 @@ import (
 
 // Transaction represents an nftables transaction
 type Transaction struct {
+	family     Family
+	table      string
 	operations []operation
 	err        error
 }
@@ -45,20 +47,15 @@ const (
 	flushVerb   verb = "flush"
 )
 
-// NewTransaction creates a new transaction.
-func NewTransaction() *Transaction {
-	return &Transaction{}
-}
-
 // asCommandBuf returns the transaction as an io.Reader that outputs a series of nft commands
-func (tx *Transaction) asCommandBuf(family Family, table string) (io.Reader, error) {
+func (tx *Transaction) asCommandBuf() (io.Reader, error) {
 	if tx.err != nil {
 		return nil, tx.err
 	}
 
 	buf := &bytes.Buffer{}
 	for _, op := range tx.operations {
-		op.obj.writeOperation(op.verb, family, table, buf)
+		op.obj.writeOperation(op.verb, tx.family, tx.table, buf)
 	}
 	return buf, nil
 }

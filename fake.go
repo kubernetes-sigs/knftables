@@ -151,6 +151,14 @@ func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]
 	return nil, notFoundError("no such %s %q", objectType, name)
 }
 
+// NewTransaction is part of Interface
+func (fake *Fake) NewTransaction() *Transaction {
+	return &Transaction{
+		family: fake.family,
+		table:  fake.table,
+	}
+}
+
 // Run is part of Interface
 func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 	if tx.err != nil {

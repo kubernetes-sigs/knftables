@@ -29,6 +29,9 @@ type Interface interface {
 	// Present determines if nftables is present/usable on the system.
 	Present() error
 
+	// NewTransaction returns a new (empty) Transaction
+	NewTransaction() *Transaction
+
 	// Run runs a Transaction and returns the result. The IsNotFound and
 	// IsAlreadyExists methods can be used to test the result.
 	Run(ctx context.Context, tx *Transaction) error
@@ -86,13 +89,21 @@ func (nft *realNFTables) Present() error {
 	return err
 }
 
+// NewTransaction is part of Interface
+func (nft *realNFTables) NewTransaction() *Transaction {
+	return &Transaction{
+		family: nft.family,
+		table:  nft.table,
+	}
+}
+
 // Run is part of Interface
 func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 	if tx.err != nil {
 		return tx.err
 	}
 
-	buf, err := tx.asCommandBuf(nft.family, nft.table)
+	buf, err := tx.asCommandBuf()
 	if err != nil {
 		return err
 	}

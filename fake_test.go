@@ -34,7 +34,7 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("expected table not found error but got: %v", err)
 	}
 
-	tx := NewTransaction()
+	tx := fake.NewTransaction()
 
 	tx.Add(&Table{})
 	tx.Add(&Chain{
@@ -172,7 +172,7 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("unexpected result from List(chains): %v", chains)
 	}
 
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 	tx.Delete(ruleToDelete)
 	err = fake.Run(context.Background(), tx)
 	if err != nil {
@@ -194,7 +194,7 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("unexpected Dump content after delete:\nexpected\n%s\n\ngot\n%s", expected, dump)
 	}
 
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 	tx.Delete(ruleToDelete)
 	err = fake.Run(context.Background(), tx)
 	if err == nil || !IsNotFound(err) {
@@ -237,7 +237,7 @@ func assertRules(t *testing.T, fake *Fake, expected ...string) {
 func TestFakeAddInsertReplace(t *testing.T) {
 	fake := NewFake(IPv4Family, "kube-proxy")
 
-	tx := NewTransaction()
+	tx := fake.NewTransaction()
 	tx.Add(&Table{})
 	err := fake.Run(context.Background(), tx)
 	if err != nil {
@@ -249,7 +249,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Errorf("expected chain not found but got: %v", err)
 	}
 
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 	tx.Add(&Chain{
 		Name: "test",
 	})
@@ -261,7 +261,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	assertRules(t, fake /* no rules */)
 
 	// Test basic Add
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 	tx.Add(&Rule{
 		Chain: "test",
 		Rule:  "first",
@@ -288,7 +288,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	thirdHandle := *rules[2].Handle
 
 	// Test Add with Handle or Index
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 	// Should go after "second"
 	tx.Add(&Rule{
 		Chain: "test",
@@ -309,7 +309,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	assertRules(t, fake, "first", "fifth", "second", "fourth", "third")
 
 	// Test Insert
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 	// Should go first
 	tx.Insert(&Rule{
 		Chain: "test",
@@ -337,7 +337,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	assertRules(t, fake, "sixth", "first", "fifth", "seventh", "second", "eighth", "fourth", "third")
 
 	// Test Replace. And Delete while we're here... the chain is getting kind of long
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 
 	tx.Replace(&Rule{
 		Chain:  "test",
@@ -366,7 +366,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	}
 
 	// Test edge cases
-	tx = NewTransaction()
+	tx = fake.NewTransaction()
 	tx.Add(&Rule{
 		Chain: "test",
 		Rule:  "tenth",
