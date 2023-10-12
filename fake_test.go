@@ -18,11 +18,13 @@ package nftables
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 )
 
@@ -87,6 +89,25 @@ func TestFakeRun(t *testing.T) {
 		Value: []string{"drop"},
 	})
 
+	// The transaction should contain exactly those commands, in order
+	expected := strings.TrimPrefix(dedent.Dedent(`
+		add table ip kube-proxy
+		add chain ip kube-proxy chain { comment "foo" ; }
+		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add rule ip kube-proxy chain masquerade comment "comment"
+		add chain ip kube-proxy anotherchain
+		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
+		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
+		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
+		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : goto chain }
+		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
+		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
+		`), "\n")
+	diff := cmp.Diff(expected, tx.String())
+	if diff != "" {
+		t.Errorf("unexpected transaction content:\n%s", diff)
+	}
+
 	err = fake.Run(context.Background(), tx)
 	if err != nil {
 		t.Fatalf("unexpected error from Run: %v", err)
@@ -143,7 +164,10 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected map element for key \"192.168.0.1 . tcp . 80\": %+v", elem)
 	}
 
-	expected := strings.TrimPrefix(dedent.Dedent(`
+	// The expected Dump() result is different from the expected Transaction content
+	// above; it will be sorted, and the map element that was later overwritten won't
+	// be seen.
+	expected = strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
 		add chain ip kube-proxy anotherchain
 		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
@@ -155,9 +179,9 @@ func TestFakeRun(t *testing.T) {
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
-	dump := fake.Dump()
-	if dump != expected {
-		t.Errorf("unexpected Dump content:\nexpected\n%s\n\ngot\n%s", expected, dump)
+	diff = cmp.Diff(expected, fake.Dump())
+	if diff != "" {
+		t.Errorf("unexpected Dump content:\n%s", diff)
 	}
 
 	chains, err := fake.List(context.Background(), "chains")
@@ -174,6 +198,11 @@ func TestFakeRun(t *testing.T) {
 
 	tx = fake.NewTransaction()
 	tx.Delete(ruleToDelete)
+	expected = fmt.Sprintf("delete rule ip kube-proxy chain handle %d\n", *ruleToDelete.Handle)
+	diff = cmp.Diff(expected, tx.String())
+	if diff != "" {
+		t.Errorf("unexpected transaction content:\n%s", diff)
+	}
 	err = fake.Run(context.Background(), tx)
 	if err != nil {
 		t.Fatalf("unexpected error from Run: %v", err)
@@ -189,9 +218,9 @@ func TestFakeRun(t *testing.T) {
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
-	dump = fake.Dump()
-	if dump != expected {
-		t.Errorf("unexpected Dump content after delete:\nexpected\n%s\n\ngot\n%s", expected, dump)
+	diff = cmp.Diff(expected, fake.Dump())
+	if diff != "" {
+		t.Errorf("unexpected Dump content:\n%s", diff)
 	}
 
 	tx = fake.NewTransaction()

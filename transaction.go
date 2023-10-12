@@ -18,6 +18,7 @@ package nftables
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 )
 
@@ -58,6 +59,21 @@ func (tx *Transaction) asCommandBuf() (io.Reader, error) {
 		op.obj.writeOperation(op.verb, tx.family, tx.table, buf)
 	}
 	return buf, nil
+}
+
+// String returns the transaction as a string containing the nft commands; if there is
+// a pending error, it will be output as a comment at the end of the transaction.
+func (tx *Transaction) String() string {
+	buf := &bytes.Buffer{}
+	for _, op := range tx.operations {
+		op.obj.writeOperation(op.verb, tx.family, tx.table, buf)
+	}
+
+	if tx.err != nil {
+		fmt.Fprintf(buf, "# ERROR: %v", tx.err)
+	}
+
+	return buf.String()
 }
 
 func (tx *Transaction) operation(verb verb, obj Object) {
