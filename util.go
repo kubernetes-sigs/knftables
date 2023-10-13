@@ -77,33 +77,41 @@ func ParsePriority(family Family, priority string) (int, error) {
 // arguments and concatenates them together into a single string with spaces between the
 // arguments. Strings are output as-is, string arrays are output element by element,
 // numbers are output as with `fmt.Sprintf("%d")`, and all other types are output as with
-// `fmt.Sprintf("%s")`.
+// `fmt.Sprintf("%s")`. To help with set/map lookup syntax, an argument of "@" will not
+// be followed by a space, so you can do, eg, `Concat("ip saddr", "@", setName)`.
 func Concat(args ...interface{}) string {
 	b := &strings.Builder{}
+	var needSpace, wroteAt bool
 	for _, arg := range args {
-		// Ignore empty array arguments
-		if x, ok := arg.([]string); ok && len(x) == 0 {
-			continue
-		}
-
-		if b.Len() > 0 {
-			b.WriteByte(' ')
-		}
 		switch x := arg.(type) {
 		case string:
+			if needSpace {
+				b.WriteByte(' ')
+			}
 			b.WriteString(x)
+			wroteAt = (x == "@")
 		case []string:
-			for j, s := range x {
-				if j > 0 {
+			for _, s := range x {
+				if needSpace {
 					b.WriteByte(' ')
 				}
 				b.WriteString(s)
+				wroteAt = (s == "@")
+				needSpace = b.Len() > 0 && !wroteAt
 			}
 		case int, uint, int16, uint16, int32, uint32, int64, uint64:
+			if needSpace {
+				b.WriteByte(' ')
+			}
 			fmt.Fprintf(b, "%d", x)
 		default:
+			if needSpace {
+				b.WriteByte(' ')
+			}
 			fmt.Fprintf(b, "%s", x)
 		}
+
+		needSpace = b.Len() > 0 && !wroteAt
 	}
 	return b.String()
 }

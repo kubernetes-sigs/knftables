@@ -76,10 +76,12 @@ func TestConcat(t *testing.T) {
 				IPv4Family, "saddr", cidr,
 				[]string{},
 				"th port", 8080,
+				"@", "mySetName",
+				[]string{"@", "myMapName"},
 				[]string{"ct", "state", "established"},
 				"drop",
 			},
-			out: "ip saddr 10.2.0.0/24 th port 8080 ct state established drop",
+			out: "ip saddr 10.2.0.0/24 th port 8080 @mySetName @myMapName ct state established drop",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
