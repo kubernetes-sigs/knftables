@@ -53,7 +53,7 @@ tx := nft.NewTransaction()
 
 tx.Add(&nftables.Chain{
         Name:    "mychain",
-        Comment: nftables.Optional("this is my chain"),
+        Comment: nftables.PtrTo("this is my chain"),
 })
 tx.Flush(&nftables.Chain{
         Name: "mychain",
@@ -106,8 +106,7 @@ The currently-supported objects are:
 - `Element`
 
 Optional fields in objects can be filled in with the help of the
-`Optional()` function, which just returns a pointer to its
-argument.
+`PtrTo()` function, which just returns a pointer to its argument.
 
 `Concat()` can be used to concatenate a series of strings, `[]string`
 arrays, and other arguments (including numbers, `net.IP`s /

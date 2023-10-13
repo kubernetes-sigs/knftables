@@ -280,7 +280,7 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 		}
 
 		if handle, ok := jsonVal[float64](jsonRule, "handle"); ok {
-			rule.Handle = Optional(int(handle))
+			rule.Handle = PtrTo(int(handle))
 		}
 		if comment, ok := jsonVal[string](jsonRule, "comment"); ok {
 			rule.Comment = &comment

@@ -22,8 +22,8 @@ import (
 	"strings"
 )
 
-// Optional can be used to fill in optional field values in objects
-func Optional[T any](val T) *T {
+// PtrTo can be used to fill in optional field values in objects
+func PtrTo[T any](val T) *T {
 	return &val
 }
 

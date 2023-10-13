@@ -177,7 +177,7 @@ func TestRun(t *testing.T) {
 	tx.Add(&Table{})
 	tx.Add(&Chain{
 		Name:    "chain",
-		Comment: Optional("foo"),
+		Comment: PtrTo("foo"),
 	})
 	tx.Add(&Rule{
 		Chain: "chain",
@@ -225,19 +225,19 @@ func Test_splitComment(t *testing.T) {
 			name:    "simple comment",
 			line:    `ip saddr 1.2.3.4 drop comment "I don't like him"`,
 			rule:    "ip saddr 1.2.3.4 drop",
-			comment: Optional("I don't like him"),
+			comment: PtrTo("I don't like him"),
 		},
 		{
 			name:    "empty comment",
 			line:    `ip saddr 1.2.3.4 drop comment ""`,
 			rule:    "ip saddr 1.2.3.4 drop",
-			comment: Optional(""),
+			comment: PtrTo(""),
 		},
 		{
 			name:    "tricky comment",
 			line:    `ip saddr 1.2.3.4 drop comment "I have no comment "`,
 			rule:    "ip saddr 1.2.3.4 drop",
-			comment: Optional("I have no comment "),
+			comment: PtrTo("I have no comment "),
 		},
 		{
 			name:    "not a comment",
@@ -249,13 +249,13 @@ func Test_splitComment(t *testing.T) {
 			name:    "not a comment plus a comment",
 			line:    `iifname "comment " drop comment "fooled ya?"`,
 			rule:    `iifname "comment " drop`,
-			comment: Optional("fooled ya?"),
+			comment: PtrTo("fooled ya?"),
 		},
 		{
 			name:    "not a comment plus tricky comment",
 			line:    `iifname "comment " drop comment "comment "`,
 			rule:    `iifname "comment " drop`,
-			comment: Optional("comment "),
+			comment: PtrTo("comment "),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -298,16 +298,16 @@ func TestListRules(t *testing.T) {
 			listOutput: []*Rule{
 				{
 					Chain:  "testchain",
-					Handle: Optional(169),
+					Handle: PtrTo(169),
 				},
 				{
 					Chain:   "testchain",
-					Comment: Optional("This rule does something"),
-					Handle:  Optional(170),
+					Comment: PtrTo("This rule does something"),
+					Handle:  PtrTo(170),
 				},
 				{
 					Chain:  "testchain",
-					Handle: Optional(171),
+					Handle: PtrTo(171),
 				},
 			},
 		},
@@ -386,7 +386,7 @@ func TestListElements(t *testing.T) {
 				{
 					Set:     "test",
 					Key:     []string{"192.168.1.3"},
-					Comment: Optional("with a comment"),
+					Comment: PtrTo("with a comment"),
 				},
 			},
 		},
@@ -406,7 +406,7 @@ func TestListElements(t *testing.T) {
 				{
 					Set:     "test",
 					Key:     []string{"192.168.1.5", "tcp", "443"},
-					Comment: Optional("foo"),
+					Comment: PtrTo("foo"),
 				},
 			},
 		},
@@ -424,7 +424,7 @@ func TestListElements(t *testing.T) {
 					Map:     "test",
 					Key:     []string{"10.0.0.2"},
 					Value:   []string{"443"},
-					Comment: Optional("a comment"),
+					Comment: PtrTo("a comment"),
 				},
 			},
 		},
@@ -442,7 +442,7 @@ func TestListElements(t *testing.T) {
 					Map:     "test",
 					Key:     []string{"192.168.1.3", "tcp"},
 					Value:   []string{"return"},
-					Comment: Optional("foo"),
+					Comment: PtrTo("foo"),
 				},
 				{
 					Map:   "test",

@@ -187,7 +187,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				table := *obj
-				table.Handle = Optional(fake.nextHandle)
+				table.Handle = PtrTo(fake.nextHandle)
 				fake.Table = &FakeTable{
 					Table:  table,
 					Chains: make(map[string]*FakeChain),
@@ -212,7 +212,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				chain := *obj
-				chain.Handle = Optional(fake.nextHandle)
+				chain.Handle = PtrTo(fake.nextHandle)
 				fake.Table.Chains[obj.Name] = &FakeChain{
 					Chain: chain,
 				}
@@ -260,14 +260,14 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				} else {
 					existingChain.Rules = append(existingChain.Rules[:refRule+1], append([]*Rule{&rule}, existingChain.Rules[refRule+1:]...)...)
 				}
-				rule.Handle = Optional(fake.nextHandle)
+				rule.Handle = PtrTo(fake.nextHandle)
 			case insertVerb:
 				if refRule == -1 {
 					existingChain.Rules = append([]*Rule{&rule}, existingChain.Rules...)
 				} else {
 					existingChain.Rules = append(existingChain.Rules[:refRule], append([]*Rule{&rule}, existingChain.Rules[refRule:]...)...)
 				}
-				rule.Handle = Optional(fake.nextHandle)
+				rule.Handle = PtrTo(fake.nextHandle)
 			case replaceVerb:
 				existingChain.Rules[refRule] = &rule
 			default:
@@ -286,7 +286,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				set := *obj
-				set.Handle = Optional(fake.nextHandle)
+				set.Handle = PtrTo(fake.nextHandle)
 				fake.Table.Sets[obj.Name] = &FakeSet{
 					Set: set,
 				}
@@ -310,7 +310,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					continue
 				}
 				mapObj := *obj
-				mapObj.Handle = Optional(fake.nextHandle)
+				mapObj.Handle = PtrTo(fake.nextHandle)
 				fake.Table.Maps[obj.Name] = &FakeMap{
 					Map: mapObj,
 				}

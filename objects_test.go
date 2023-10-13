@@ -49,7 +49,7 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "add table with comment",
 			verb:   addVerb,
-			object: &Table{Comment: Optional("foo")},
+			object: &Table{Comment: PtrTo("foo")},
 			out:    `add table ip mytable { comment "foo" ; }`,
 		},
 		{
@@ -73,7 +73,7 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "delete table by handle",
 			verb:   deleteVerb,
-			object: &Table{Handle: Optional(5)},
+			object: &Table{Handle: PtrTo(5)},
 			out:    `delete table ip handle 5`,
 		},
 		{
@@ -91,7 +91,7 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "invalid add table with Handle",
 			verb:   addVerb,
-			object: &Table{Handle: Optional(5)},
+			object: &Table{Handle: PtrTo(5)},
 			err:    "cannot specify Handle",
 		},
 
@@ -105,19 +105,19 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "add chain with comment",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Comment: Optional("foo")},
+			object: &Chain{Name: "mychain", Comment: PtrTo("foo")},
 			out:    `add chain ip mytable mychain { comment "foo" ; }`,
 		},
 		{
 			name:   "add base chain",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority)},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority)},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; }`,
 		},
 		{
 			name:   "add base chain with comment",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority), Comment: Optional("foo")},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority), Comment: PtrTo("foo")},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; comment "foo" ; }`,
 		},
 		{
@@ -141,13 +141,13 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "delete chain by handle",
 			verb:   deleteVerb,
-			object: &Chain{Name: "mychain", Handle: Optional(5)},
+			object: &Chain{Name: "mychain", Handle: PtrTo(5)},
 			out:    `delete chain ip mytable handle 5`,
 		},
 		{
 			name:   "delete chain by handle (without name)",
 			verb:   deleteVerb,
-			object: &Chain{Handle: Optional(5)},
+			object: &Chain{Handle: PtrTo(5)},
 			out:    `delete chain ip mytable handle 5`,
 		},
 		{
@@ -171,43 +171,43 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "invalid add chain with handle",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Handle: Optional(5)},
+			object: &Chain{Name: "mychain", Handle: PtrTo(5)},
 			err:    "cannot specify Handle",
 		},
 		{
 			name:   "invalid add base chain with no Type",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority)},
+			object: &Chain{Name: "mychain", Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority)},
 			err:    "must specify Type and Priority",
 		},
 		{
 			name:   "invalid add base chain with no Priority",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook)},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook)},
 			err:    "must specify Type and Priority",
 		},
 		{
 			name:   "invalid add base chain with no Type or Priority",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Hook: Optional(PostroutingHook)},
+			object: &Chain{Name: "mychain", Hook: PtrTo(PostroutingHook)},
 			err:    "must specify Type and Priority",
 		},
 		{
 			name:   "invalid add non-base chain with Type and Priority",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: Optional(NATType), Priority: Optional(SNATPriority)},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Priority: PtrTo(SNATPriority)},
 			err:    "must not specify Type or Priority",
 		},
 		{
 			name:   "invalid add non-base chain with Type",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: Optional(NATType)},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType)},
 			err:    "must not specify Type or Priority",
 		},
 		{
 			name:   "invalid add non-base chain with Priority",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Priority: Optional(SNATPriority)},
+			object: &Chain{Name: "mychain", Priority: PtrTo(SNATPriority)},
 			err:    "must not specify Type or Priority",
 		},
 
@@ -221,19 +221,19 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "add rule with comment",
 			verb:   addVerb,
-			object: &Rule{Chain: "mychain", Rule: "drop", Comment: Optional("comment")},
+			object: &Rule{Chain: "mychain", Rule: "drop", Comment: PtrTo("comment")},
 			out:    `add rule ip mytable mychain drop comment "comment"`,
 		},
 		{
 			name:   "add rule relative to index",
 			verb:   addVerb,
-			object: &Rule{Chain: "mychain", Rule: "drop", Index: Optional(2)},
+			object: &Rule{Chain: "mychain", Rule: "drop", Index: PtrTo(2)},
 			out:    `add rule ip mytable mychain index 2 drop`,
 		},
 		{
 			name:   "add rule relative to handle",
 			verb:   addVerb,
-			object: &Rule{Chain: "mychain", Rule: "drop", Handle: Optional(2)},
+			object: &Rule{Chain: "mychain", Rule: "drop", Handle: PtrTo(2)},
 			out:    `add rule ip mytable mychain handle 2 drop`,
 		},
 		{
@@ -245,25 +245,25 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "insert rule with comment relative to handle",
 			verb:   insertVerb,
-			object: &Rule{Chain: "mychain", Rule: "drop", Comment: Optional("comment"), Handle: Optional(2)},
+			object: &Rule{Chain: "mychain", Rule: "drop", Comment: PtrTo("comment"), Handle: PtrTo(2)},
 			out:    `insert rule ip mytable mychain handle 2 drop comment "comment"`,
 		},
 		{
 			name:   "replace rule",
 			verb:   replaceVerb,
-			object: &Rule{Chain: "mychain", Rule: "drop", Handle: Optional(2)},
+			object: &Rule{Chain: "mychain", Rule: "drop", Handle: PtrTo(2)},
 			out:    `replace rule ip mytable mychain handle 2 drop`,
 		},
 		{
 			name:   "delete rule",
 			verb:   deleteVerb,
-			object: &Rule{Chain: "mychain", Rule: "drop", Handle: Optional(2)},
+			object: &Rule{Chain: "mychain", Rule: "drop", Handle: PtrTo(2)},
 			out:    `delete rule ip mytable mychain handle 2`,
 		},
 		{
 			name:   "delete rule without Rule",
 			verb:   deleteVerb,
-			object: &Rule{Chain: "mychain", Handle: Optional(2)},
+			object: &Rule{Chain: "mychain", Handle: PtrTo(2)},
 			out:    `delete rule ip mytable mychain handle 2`,
 		},
 		{
@@ -293,7 +293,7 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "invalid add rule with both Index and Handle",
 			verb:   addVerb,
-			object: &Rule{Chain: "mychain", Rule: "drop", Index: Optional(2), Handle: Optional(5)},
+			object: &Rule{Chain: "mychain", Rule: "drop", Index: PtrTo(2), Handle: PtrTo(5)},
 			err:    "both Index and Handle",
 		},
 		{
@@ -329,12 +329,12 @@ func TestObjects(t *testing.T) {
 				Name:       "myset",
 				Type:       "ipv4_addr",
 				Flags:      []SetFlag{DynamicFlag, IntervalFlag},
-				Timeout:    Optional(3 * time.Minute),
-				GCInterval: Optional(time.Hour),
-				Size:       Optional[uint64](1000),
-				Policy:     Optional(PerformancePolicy),
-				AutoMerge:  Optional(true),
-				Comment:    Optional("that's a lot of options"),
+				Timeout:    PtrTo(3 * time.Minute),
+				GCInterval: PtrTo(time.Hour),
+				Size:       PtrTo[uint64](1000),
+				Policy:     PtrTo(PerformancePolicy),
+				AutoMerge:  PtrTo(true),
+				Comment:    PtrTo("that's a lot of options"),
 			},
 			out: `add set ip mytable myset { type ipv4_addr ; flags dynamic,interval ; timeout 180s ; gc-interval 3600s ; size 1000 ; policy performance ; auto-merge ; comment "that's a lot of options" ; }`,
 		},
@@ -365,13 +365,13 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "delete set by handle",
 			verb:   deleteVerb,
-			object: &Set{Name: "myset", Handle: Optional(5)},
+			object: &Set{Name: "myset", Handle: PtrTo(5)},
 			out:    `delete set ip mytable handle 5`,
 		},
 		{
 			name:   "delete set by handle without Name",
 			verb:   deleteVerb,
-			object: &Set{Handle: Optional(5)},
+			object: &Set{Handle: PtrTo(5)},
 			out:    `delete set ip mytable handle 5`,
 		},
 		{
@@ -407,7 +407,7 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "invalid add set with Handle",
 			verb:   addVerb,
-			object: &Set{Name: "myset", Type: "ipv4_addr", Handle: Optional(5)},
+			object: &Set{Name: "myset", Type: "ipv4_addr", Handle: PtrTo(5)},
 			err:    "cannot specify Handle",
 		},
 
@@ -431,11 +431,11 @@ func TestObjects(t *testing.T) {
 				Name:       "mymap",
 				Type:       "ipv4_addr : ipv4_addr",
 				Flags:      []SetFlag{DynamicFlag, IntervalFlag},
-				Timeout:    Optional(3 * time.Minute),
-				GCInterval: Optional(time.Hour),
-				Size:       Optional[uint64](1000),
-				Policy:     Optional(PerformancePolicy),
-				Comment:    Optional("that's a lot of options"),
+				Timeout:    PtrTo(3 * time.Minute),
+				GCInterval: PtrTo(time.Hour),
+				Size:       PtrTo[uint64](1000),
+				Policy:     PtrTo(PerformancePolicy),
+				Comment:    PtrTo("that's a lot of options"),
 			},
 			out: `add map ip mytable mymap { type ipv4_addr : ipv4_addr ; flags dynamic,interval ; timeout 180s ; gc-interval 3600s ; size 1000 ; policy performance ; comment "that's a lot of options" ; }`,
 		},
@@ -466,13 +466,13 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "delete map by Handle",
 			verb:   deleteVerb,
-			object: &Map{Name: "mymap", Handle: Optional(5)},
+			object: &Map{Name: "mymap", Handle: PtrTo(5)},
 			out:    `delete map ip mytable handle 5`,
 		},
 		{
 			name:   "delete map by Handle without Name",
 			verb:   deleteVerb,
-			object: &Map{Handle: Optional(5)},
+			object: &Map{Handle: PtrTo(5)},
 			out:    `delete map ip mytable handle 5`,
 		},
 		{
@@ -508,7 +508,7 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "invalid add map with Handle",
 			verb:   addVerb,
-			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr", Handle: Optional(5)},
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr", Handle: PtrTo(5)},
 			err:    "cannot specify Handle",
 		},
 
@@ -528,13 +528,13 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "create (set) element with comment",
 			verb:   createVerb,
-			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}, Comment: Optional("comment")},
+			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}, Comment: PtrTo("comment")},
 			out:    `create element ip mytable myset { 10.0.0.1 comment "comment" }`,
 		},
 		{
 			name:   "create (map) element with comment",
 			verb:   addVerb,
-			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}, Comment: Optional("comment")},
+			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}, Comment: PtrTo("comment")},
 			out:    `add element ip mytable mymap { 10.0.0.1 comment "comment" : 192.168.1.1 }`,
 		},
 		{
@@ -651,42 +651,42 @@ func TestNoObjectComments(t *testing.T) {
 	}{
 		{
 			name:   "add table with comment",
-			object: &Table{Comment: Optional("foo")},
+			object: &Table{Comment: PtrTo("foo")},
 			out:    `add table ip mytable`,
 		},
 		{
 			name:   "add chain with comment",
-			object: &Chain{Name: "mychain", Comment: Optional("foo")},
+			object: &Chain{Name: "mychain", Comment: PtrTo("foo")},
 			out:    `add chain ip mytable mychain`,
 		},
 		{
 			name:   "add base chain with comment",
-			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority), Comment: Optional("foo")},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority), Comment: PtrTo("foo")},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; }`,
 		},
 		{
 			name:   "add rule with comment",
-			object: &Rule{Chain: "mychain", Rule: "drop", Comment: Optional("comment")},
+			object: &Rule{Chain: "mychain", Rule: "drop", Comment: PtrTo("comment")},
 			out:    `add rule ip mytable mychain drop comment "comment"`,
 		},
 		{
 			name:   "add set with comment",
-			object: &Set{Name: "myset", Type: "ipv4_addr", Comment: Optional("comment")},
+			object: &Set{Name: "myset", Type: "ipv4_addr", Comment: PtrTo("comment")},
 			out:    `add set ip mytable myset { type ipv4_addr ; }`,
 		},
 		{
 			name:   "add map with comment",
-			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr", Comment: Optional("comment")},
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr", Comment: PtrTo("comment")},
 			out:    `add map ip mytable mymap { type ipv4_addr : ipv4_addr ; }`,
 		},
 		{
 			name:   "add (set) element with comment",
-			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}, Comment: Optional("comment")},
+			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}, Comment: PtrTo("comment")},
 			out:    `add element ip mytable myset { 10.0.0.1 comment "comment" }`,
 		},
 		{
 			name:   "add (map) element with comment",
-			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}, Comment: Optional("comment")},
+			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}, Comment: PtrTo("comment")},
 			out:    `add element ip mytable mymap { 10.0.0.1 comment "comment" : 192.168.1.1 }`,
 		},
 	} {

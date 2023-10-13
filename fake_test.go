@@ -41,7 +41,7 @@ func TestFakeRun(t *testing.T) {
 	tx.Add(&Table{})
 	tx.Add(&Chain{
 		Name:    "chain",
-		Comment: Optional("foo"),
+		Comment: PtrTo("foo"),
 	})
 	tx.Add(&Rule{
 		Chain: "chain",
@@ -50,7 +50,7 @@ func TestFakeRun(t *testing.T) {
 	tx.Add(&Rule{
 		Chain:   "chain",
 		Rule:    "masquerade",
-		Comment: Optional("comment"),
+		Comment: PtrTo("comment"),
 	})
 
 	tx.Add(&Chain{
@@ -59,12 +59,12 @@ func TestFakeRun(t *testing.T) {
 	tx.Add(&Rule{
 		Chain:   "anotherchain",
 		Rule:    "ip saddr 1.2.3.4 drop",
-		Comment: Optional("drop rule"),
+		Comment: PtrTo("drop rule"),
 	})
 	tx.Add(&Rule{
 		Chain:   "anotherchain",
 		Rule:    "ip daddr 5.6.7.8 reject",
-		Comment: Optional("reject rule"),
+		Comment: PtrTo("reject rule"),
 	})
 
 	tx.Add(&Map{
@@ -80,7 +80,7 @@ func TestFakeRun(t *testing.T) {
 		Map:     "map1",
 		Key:     []string{"192.168.0.2", "tcp", "443"},
 		Value:   []string{"goto anotherchain"},
-		Comment: Optional("with a comment"),
+		Comment: PtrTo("with a comment"),
 	})
 	// Duplicate element
 	tx.Add(&Element{
@@ -322,13 +322,13 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	tx.Add(&Rule{
 		Chain: "test",
 		Rule:  "fourth",
-		Index: Optional(1),
+		Index: PtrTo(1),
 	})
 	// Should go after "first"
 	tx.Add(&Rule{
 		Chain:  "test",
 		Rule:   "fifth",
-		Handle: Optional(firstHandle),
+		Handle: PtrTo(firstHandle),
 	})
 	err = fake.Run(context.Background(), tx)
 	if err != nil {
@@ -348,7 +348,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	tx.Insert(&Rule{
 		Chain:  "test",
 		Rule:   "seventh",
-		Handle: Optional(secondHandle),
+		Handle: PtrTo(secondHandle),
 	})
 	// Should go before "fourth". ("fourth" was rule[3] before this
 	// transaction and the previous two operations added two more rules
@@ -356,7 +356,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	tx.Insert(&Rule{
 		Chain: "test",
 		Rule:  "eighth",
-		Index: Optional(5),
+		Index: PtrTo(5),
 	})
 	err = fake.Run(context.Background(), tx)
 	if err != nil {
@@ -371,11 +371,11 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	tx.Replace(&Rule{
 		Chain:  "test",
 		Rule:   "ninth",
-		Handle: Optional(secondHandle),
+		Handle: PtrTo(secondHandle),
 	})
 	tx.Delete(&Rule{
 		Chain:  "test",
-		Handle: Optional(firstHandle),
+		Handle: PtrTo(firstHandle),
 	})
 	err = fake.Run(context.Background(), tx)
 	if err != nil {
@@ -399,22 +399,22 @@ func TestFakeAddInsertReplace(t *testing.T) {
 	tx.Add(&Rule{
 		Chain: "test",
 		Rule:  "tenth",
-		Index: Optional(len(rules) - 1),
+		Index: PtrTo(len(rules) - 1),
 	})
 	tx.Insert(&Rule{
 		Chain: "test",
 		Rule:  "eleventh",
-		Index: Optional(len(rules)),
+		Index: PtrTo(len(rules)),
 	})
 	tx.Add(&Rule{
 		Chain: "test",
 		Rule:  "twelfth",
-		Index: Optional(0),
+		Index: PtrTo(0),
 	})
 	tx.Insert(&Rule{
 		Chain: "test",
 		Rule:  "thirteenth",
-		Index: Optional(0),
+		Index: PtrTo(0),
 	})
 	err = fake.Run(context.Background(), tx)
 	if err != nil {
