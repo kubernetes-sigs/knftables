@@ -17,10 +17,8 @@ Create an `Interface` object to manage operations on a single nftables
 table:
 
 ```golang
-nft := nftables.New(nftables.IPv4Family, "my-table")
-
-// Make sure nftables actually works here
-if err := nft.Present(); err != nil {
+nft, err := nftables.New(nftables.IPv4Family, "my-table")
+if err != nil {
         return fmt.Errorf("no nftables support: %v", err)
 }
 ```

@@ -27,6 +27,17 @@ import (
 	"github.com/lithammer/dedent"
 )
 
+func newTestInterface(t *testing.T, family Family, tableName string) (Interface, *fakeExec, error) {
+	fexec := newFakeExec(t)
+	fexec.expected = append(fexec.expected,
+		expectedCmd{
+			args: []string{"/nft", "--check", "add", "table", "ip", tableName},
+		},
+	)
+	nft, err := newInternal(family, tableName, fexec)
+	return nft, fexec, err
+}
+
 func TestListBad(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -87,16 +98,15 @@ func TestListBad(t *testing.T) {
 				nftErr = fmt.Errorf(tc.nftError)
 			}
 
-			fexec := newFakeExec(t)
+			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
+
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "--json", "list", "chains", "ip"},
+					args:   []string{"/nft", "--json", "list", "chains", "ip"},
 					stdout: tc.nftOutput,
 					err:    nftErr,
 				},
 			)
-			nft := newInternal(IPv4Family, "testing", fexec)
-
 			result, err := nft.List(context.Background(), "chains")
 			if result != nil {
 				t.Errorf("unexpected non-nil result: %v", result)
@@ -135,15 +145,14 @@ func TestList(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fexec := newFakeExec(t)
+			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
+
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "--json", "list", "chains", "ip"},
+					args:   []string{"/nft", "--json", "list", "chains", "ip"},
 					stdout: tc.nftOutput,
 				},
 			)
-			nft := newInternal(IPv4Family, "testing", fexec)
-
 			result, err := nft.List(context.Background(), tc.objType)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -156,8 +165,8 @@ func TestList(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	fexec := newFakeExec(t)
-	nft := newInternal(IPv4Family, "kube-proxy", fexec)
+	nft, fexec, _ := newTestInterface(t, IPv4Family, "kube-proxy")
+
 	tx := nft.NewTransaction()
 
 	tx.Add(&Table{})
@@ -177,7 +186,7 @@ func TestRun(t *testing.T) {
 		`), "\n")
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
-			args:  []string{"nft", "-f", "-"},
+			args:  []string{"/nft", "-f", "-"},
 			stdin: expected,
 		},
 	)
@@ -299,20 +308,19 @@ func TestListRules(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fexec := newFakeExec(t)
+			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
+
 			var err error
 			if tc.nftError != "" {
 				err = fmt.Errorf(tc.nftError)
 			}
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "--json", "list", "chain", "ip", "testing", "testchain"},
+					args:   []string{"/nft", "--json", "list", "chain", "ip", "testing", "testchain"},
 					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
 					err:    err,
 				},
 			)
-			nft := newInternal(IPv4Family, "testing", fexec)
-
 			result, err := nft.ListRules(context.Background(), "testchain")
 			if err != nil {
 				if tc.nftError == "" {
@@ -440,19 +448,19 @@ func TestListElements(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fexec := newFakeExec(t)
+			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
+
 			var err error
 			if tc.nftError != "" {
 				err = fmt.Errorf(tc.nftError)
 			}
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"nft", "--json", "list", tc.objectType, "ip", "testing", "test"},
+					args:   []string{"/nft", "--json", "list", tc.objectType, "ip", "testing", "test"},
 					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
 					err:    err,
 				},
 			)
-			nft := newInternal(IPv4Family, "testing", fexec)
 
 			result, err := nft.ListElements(context.Background(), tc.objectType, "test")
 			if err != nil {

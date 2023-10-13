@@ -86,11 +86,6 @@ func NewFake(family Family, table string) *Fake {
 
 var _ Interface = &Fake{}
 
-// Present is part of Interface.
-func (fake *Fake) Present() error {
-	return nil
-}
-
 // List is part of Interface.
 func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error) {
 	if fake.Table == nil {

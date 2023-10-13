@@ -26,9 +26,6 @@ import (
 
 // Interface is an interface for running nftables commands against a given family and table.
 type Interface interface {
-	// Present determines if nftables is present/usable on the system.
-	Present() error
-
 	// NewTransaction returns a new (empty) Transaction
 	NewTransaction() *Transaction
 
@@ -59,34 +56,40 @@ type Interface interface {
 type realNFTables struct {
 	family Family
 	table  string
+	path   string
 
 	exec execer
 }
 
 // for unit tests
-func newInternal(family Family, table string, exec execer) Interface {
-	return &realNFTables{
+func newInternal(family Family, table string, execer execer) (Interface, error) {
+	var err error
+
+	nft := &realNFTables{
 		family: family,
 		table:  table,
 
-		exec: exec,
+		exec: execer,
 	}
+
+	nft.path, err = nft.exec.LookPath("nft")
+	if err != nil {
+		return nil, fmt.Errorf("could not find nftables binary: %w", err)
+	}
+
+	cmd := exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table)
+	_, err = nft.exec.Run(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("could not run nftables command: %w", err)
+	}
+
+	return nft, nil
 }
 
-// New creates a new nftables.Interface for interacting with the given table.
-func New(family Family, table string) Interface {
+// New creates a new nftables.Interface for interacting with the given table. If nftables
+// is not available/usable on the current host, it will return an error.
+func New(family Family, table string) (Interface, error) {
 	return newInternal(family, table, realExec{})
-}
-
-// Present is part of Interface.
-func (nft *realNFTables) Present() error {
-	if _, err := nft.exec.LookPath("nft"); err != nil {
-		return fmt.Errorf("could not run nftables binary: %w", err)
-	}
-
-	cmd := exec.Command("nft", "--check", "add", "table", string(nft.family), nft.table)
-	_, err := nft.exec.Run(cmd)
-	return err
 }
 
 // NewTransaction is part of Interface
@@ -108,7 +111,7 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, "nft", "-f", "-")
+	cmd := exec.CommandContext(ctx, nft.path, "-f", "-")
 	cmd.Stdin = buf
 	_, err = nft.exec.Run(cmd)
 	return err
@@ -217,7 +220,7 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 		typePlural = objectType + "s"
 	}
 
-	cmd := exec.CommandContext(ctx, "nft", "--json", "list", typePlural, string(nft.family))
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", typePlural, string(nft.family))
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -244,7 +247,7 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 // ListRules is part of Interface
 func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
-	cmd := exec.CommandContext(ctx, "nft", "--json", "list", "chain", string(nft.family), nft.table, chain)
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -275,7 +278,7 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 // ListElements is part of Interface
 func (nft *realNFTables) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
-	cmd := exec.CommandContext(ctx, "nft", "--json", "list", objectType, string(nft.family), nft.table, name)
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", objectType, string(nft.family), nft.table, name)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
