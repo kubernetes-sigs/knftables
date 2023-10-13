@@ -624,7 +624,8 @@ func TestObjects(t *testing.T) {
 
 			if err == nil && tc.err == "" {
 				b := &strings.Builder{}
-				tc.object.writeOperation(tc.verb, IPv4Family, "mytable", b)
+				ctx := &nftContext{family: IPv4Family, table: "mytable"}
+				tc.object.writeOperation(tc.verb, ctx, b)
 				out := strings.TrimSuffix(b.String(), "\n")
 				if out != tc.out {
 					t.Errorf("expected %q but got %q", tc.out, out)
@@ -639,6 +640,65 @@ func TestObjects(t *testing.T) {
 		if len(verbs) != numVerbs {
 			t.Errorf("expected to test %d verbs for %s, got %d (%v)", numVerbs, objType, len(verbs), verbs)
 		}
+	}
+}
+
+func TestNoObjectComments(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		object Object
+		out    string
+	}{
+		{
+			name:   "add table with comment",
+			object: &Table{Comment: Optional("foo")},
+			out:    `add table ip mytable`,
+		},
+		{
+			name:   "add chain with comment",
+			object: &Chain{Name: "mychain", Comment: Optional("foo")},
+			out:    `add chain ip mytable mychain`,
+		},
+		{
+			name:   "add base chain with comment",
+			object: &Chain{Name: "mychain", Type: Optional(NATType), Hook: Optional(PostroutingHook), Priority: Optional(SNATPriority), Comment: Optional("foo")},
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; }`,
+		},
+		{
+			name:   "add rule with comment",
+			object: &Rule{Chain: "mychain", Rule: "drop", Comment: Optional("comment")},
+			out:    `add rule ip mytable mychain drop comment "comment"`,
+		},
+		{
+			name:   "add set with comment",
+			object: &Set{Name: "myset", Type: "ipv4_addr", Comment: Optional("comment")},
+			out:    `add set ip mytable myset { type ipv4_addr ; }`,
+		},
+		{
+			name:   "add map with comment",
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr", Comment: Optional("comment")},
+			out:    `add map ip mytable mymap { type ipv4_addr : ipv4_addr ; }`,
+		},
+		{
+			name:   "add (set) element with comment",
+			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}, Comment: Optional("comment")},
+			out:    `add element ip mytable myset { 10.0.0.1 comment "comment" }`,
+		},
+		{
+			name:   "add (map) element with comment",
+			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}, Comment: Optional("comment")},
+			out:    `add element ip mytable mymap { 10.0.0.1 comment "comment" : 192.168.1.1 }`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &strings.Builder{}
+			ctx := &nftContext{family: IPv4Family, table: "mytable", noObjectComments: true}
+			tc.object.writeOperation(addVerb, ctx, b)
+			out := strings.TrimSuffix(b.String(), "\n")
+			if out != tc.out {
+				t.Errorf("expected %q but got %q", tc.out, out)
+			}
+		})
 	}
 }
 

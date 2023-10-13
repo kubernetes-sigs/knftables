@@ -26,8 +26,7 @@ import (
 
 // Fake is a fake implementation of Interface
 type Fake struct {
-	family Family
-	table  string
+	nftContext
 
 	nextHandle int
 
@@ -79,8 +78,10 @@ type FakeMap struct {
 // NewFake creates a new fake Interface, for unit tests
 func NewFake(family Family, table string) *Fake {
 	return &Fake{
-		family: family,
-		table:  table,
+		nftContext: nftContext{
+			family: family,
+			table:  table,
+		},
 	}
 }
 
@@ -148,10 +149,7 @@ func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]
 
 // NewTransaction is part of Interface
 func (fake *Fake) NewTransaction() *Transaction {
-	return &Transaction{
-		family: fake.family,
-		table:  fake.table,
-	}
+	return &Transaction{nftContext: &fake.nftContext}
 }
 
 // Run is part of Interface
@@ -414,35 +412,35 @@ func (fake *Fake) Dump() string {
 	buf := &strings.Builder{}
 
 	table := fake.Table
-	table.writeOperation(addVerb, fake.family, fake.table, buf)
+	table.writeOperation(addVerb, &fake.nftContext, buf)
 
 	for _, cname := range sortKeys(table.Chains) {
 		ch := table.Chains[cname]
-		ch.writeOperation(addVerb, fake.family, fake.table, buf)
+		ch.writeOperation(addVerb, &fake.nftContext, buf)
 
 		for _, rule := range ch.Rules {
 			// Avoid outputing handles
 			dumpRule := *rule
 			dumpRule.Handle = nil
 			dumpRule.Index = nil
-			dumpRule.writeOperation(addVerb, fake.family, fake.table, buf)
+			dumpRule.writeOperation(addVerb, &fake.nftContext, buf)
 		}
 	}
 
 	for _, sname := range sortKeys(table.Sets) {
 		s := table.Sets[sname]
-		s.writeOperation(addVerb, fake.family, fake.table, buf)
+		s.writeOperation(addVerb, &fake.nftContext, buf)
 
 		for _, element := range s.Elements {
-			element.writeOperation(addVerb, fake.family, fake.table, buf)
+			element.writeOperation(addVerb, &fake.nftContext, buf)
 		}
 	}
 	for _, mname := range sortKeys(table.Maps) {
 		m := table.Maps[mname]
-		m.writeOperation(addVerb, fake.family, fake.table, buf)
+		m.writeOperation(addVerb, &fake.nftContext, buf)
 
 		for _, element := range m.Elements {
-			element.writeOperation(addVerb, fake.family, fake.table, buf)
+			element.writeOperation(addVerb, &fake.nftContext, buf)
 		}
 	}
 

@@ -24,8 +24,8 @@ import (
 
 // Transaction represents an nftables transaction
 type Transaction struct {
-	family     Family
-	table      string
+	*nftContext
+
 	operations []operation
 	err        error
 }
@@ -56,7 +56,7 @@ func (tx *Transaction) asCommandBuf() (io.Reader, error) {
 
 	buf := &bytes.Buffer{}
 	for _, op := range tx.operations {
-		op.obj.writeOperation(op.verb, tx.family, tx.table, buf)
+		op.obj.writeOperation(op.verb, tx.nftContext, buf)
 	}
 	return buf, nil
 }
@@ -66,7 +66,7 @@ func (tx *Transaction) asCommandBuf() (io.Reader, error) {
 func (tx *Transaction) String() string {
 	buf := &bytes.Buffer{}
 	for _, op := range tx.operations {
-		op.obj.writeOperation(op.verb, tx.family, tx.table, buf)
+		op.obj.writeOperation(op.verb, tx.nftContext, buf)
 	}
 
 	if tx.err != nil {

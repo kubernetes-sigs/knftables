@@ -29,7 +29,7 @@ type Object interface {
 
 	// writeOperation writes out an "nft" operation involving the object. It assumes
 	// that the object has been validated.
-	writeOperation(verb verb, family Family, table string, writer io.Writer)
+	writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 }
 
 // Family is an nftables family

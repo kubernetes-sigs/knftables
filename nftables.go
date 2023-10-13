@@ -52,13 +52,21 @@ type Interface interface {
 	ListElements(ctx context.Context, objectType, name string) ([]*Element, error)
 }
 
-// realNFTables is an implementation of Interface
-type realNFTables struct {
+type nftContext struct {
 	family Family
 	table  string
-	path   string
+
+	// noObjectComments is true if comments on Table/Chain/Set/Map are not supported.
+	// (Comments on Rule and Element are always supported.)
+	noObjectComments bool
+}
+
+// realNFTables is an implementation of Interface
+type realNFTables struct {
+	nftContext
 
 	exec execer
+	path string
 }
 
 // for unit tests
@@ -66,8 +74,10 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 	var err error
 
 	nft := &realNFTables{
-		family: family,
-		table:  table,
+		nftContext: nftContext{
+			family: family,
+			table:  table,
+		},
 
 		exec: execer,
 	}
@@ -83,6 +93,14 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 		return nil, fmt.Errorf("could not run nftables command: %w", err)
 	}
 
+	cmd = exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table,
+		"{", "comment", `"test"`, "}",
+	)
+	_, err = nft.exec.Run(cmd)
+	if err != nil {
+		nft.noObjectComments = true
+	}
+
 	return nft, nil
 }
 
@@ -94,10 +112,7 @@ func New(family Family, table string) (Interface, error) {
 
 // NewTransaction is part of Interface
 func (nft *realNFTables) NewTransaction() *Transaction {
-	return &Transaction{
-		family: nft.family,
-		table:  nft.table,
-	}
+	return &Transaction{nftContext: &nft.nftContext}
 }
 
 // Run is part of Interface

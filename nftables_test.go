@@ -33,6 +33,11 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 		expectedCmd{
 			args: []string{"/nft", "--check", "add", "table", "ip", tableName},
 		},
+		expectedCmd{
+			args: []string{"/nft", "--check", "add", "table", "ip", tableName,
+				"{", "comment", `"test"`, "}",
+			},
+		},
 	)
 	nft, err := newInternal(family, tableName, fexec)
 	return nft, fexec, err
@@ -476,6 +481,75 @@ func TestListElements(t *testing.T) {
 			diff := cmp.Diff(tc.listOutput, result)
 			if diff != "" {
 				t.Errorf("unexpected result:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFeatures(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		commands []expectedCmd
+		result   nftContext
+	}{
+		{
+			name: "all features",
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--check",
+						"add", "table", "ip", "testing",
+					},
+				},
+				{
+					args: []string{
+						"/nft", "--check",
+						"add", "table", "ip", "testing",
+						"{", "comment", `"test"`, "}",
+					},
+				},
+			},
+			result: nftContext{
+				family: IPv4Family,
+				table:  "testing",
+			},
+		},
+		{
+			name: "noObjectComments",
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--check",
+						"add", "table", "ip", "testing",
+					},
+				},
+				{
+					args: []string{
+						"/nft", "--check",
+						"add", "table", "ip", "testing",
+						"{", "comment", `"test"`, "}",
+					},
+					err: fmt.Errorf("Error: syntax error, unexpected comment"),
+				},
+			},
+			result: nftContext{
+				family: IPv4Family,
+				table:  "testing",
+
+				noObjectComments: true,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fexec := newFakeExec(t)
+			fexec.expected = tc.commands
+			nft, err := newInternal(IPv4Family, "testing", fexec)
+			if err != nil {
+				t.Fatalf("Unexpected error creating Interface: %v", err)
+			}
+			result := nft.(*realNFTables).nftContext
+			if !reflect.DeepEqual(tc.result, result) {
+				t.Errorf("Expected %#v, got %#v", tc.result, result)
 			}
 		})
 	}

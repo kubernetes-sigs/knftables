@@ -38,17 +38,19 @@ func (table *Table) validate(verb verb) error {
 	return nil
 }
 
-func (table *Table) writeOperation(verb verb, family Family, tableName string, writer io.Writer) {
+func (table *Table) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && table.Handle != nil {
-		fmt.Fprintf(writer, "delete table %s handle %d", family, *table.Handle)
+		fmt.Fprintf(writer, "delete table %s handle %d", ctx.family, *table.Handle)
 		return
 	}
 
 	// All other cases refer to the table by name
-	fmt.Fprintf(writer, "%s table %s %s", verb, family, tableName)
-	if (verb == addVerb || verb == createVerb) && table.Comment != nil {
-		fmt.Fprintf(writer, " { comment %q ; }", *table.Comment)
+	fmt.Fprintf(writer, "%s table %s %s", verb, ctx.family, ctx.table)
+	if verb == addVerb || verb == createVerb {
+		if table.Comment != nil && !ctx.noObjectComments {
+			fmt.Fprintf(writer, " { comment %q ; }", *table.Comment)
+		}
 	}
 	fmt.Fprintf(writer, "\n")
 }
@@ -80,25 +82,27 @@ func (chain *Chain) validate(verb verb) error {
 	return nil
 }
 
-func (chain *Chain) writeOperation(verb verb, family Family, table string, writer io.Writer) {
+func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && chain.Handle != nil {
-		fmt.Fprintf(writer, "delete chain %s %s handle %d", family, table, *chain.Handle)
+		fmt.Fprintf(writer, "delete chain %s %s handle %d", ctx.family, ctx.table, *chain.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s chain %s %s %s", verb, family, table, chain.Name)
-	if (verb == addVerb || verb == createVerb) && (chain.Type != nil || chain.Comment != nil) {
-		fmt.Fprintf(writer, " {")
+	fmt.Fprintf(writer, "%s chain %s %s %s", verb, ctx.family, ctx.table, chain.Name)
+	if verb == addVerb || verb == createVerb {
+		if chain.Type != nil || (chain.Comment != nil && !ctx.noObjectComments) {
+			fmt.Fprintf(writer, " {")
 
-		if chain.Type != nil {
-			fmt.Fprintf(writer, " type %s hook %s priority %s ;", *chain.Type, *chain.Hook, *chain.Priority)
-		}
-		if chain.Comment != nil {
-			fmt.Fprintf(writer, " comment %q ;", *chain.Comment)
-		}
+			if chain.Type != nil {
+				fmt.Fprintf(writer, " type %s hook %s priority %s ;", *chain.Type, *chain.Hook, *chain.Priority)
+			}
+			if chain.Comment != nil && !ctx.noObjectComments {
+				fmt.Fprintf(writer, " comment %q ;", *chain.Comment)
+			}
 
-		fmt.Fprintf(writer, " }")
+			fmt.Fprintf(writer, " }")
+		}
 	}
 
 	fmt.Fprintf(writer, "\n")
@@ -137,8 +141,8 @@ func (rule *Rule) validate(verb verb) error {
 	return nil
 }
 
-func (rule *Rule) writeOperation(verb verb, family Family, table string, writer io.Writer) {
-	fmt.Fprintf(writer, "%s rule %s %s %s", verb, family, table, rule.Chain)
+func (rule *Rule) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
+	fmt.Fprintf(writer, "%s rule %s %s %s", verb, ctx.family, ctx.table, rule.Chain)
 	if rule.Index != nil {
 		fmt.Fprintf(writer, " index %d", *rule.Index)
 	} else if rule.Handle != nil {
@@ -183,14 +187,14 @@ func (set *Set) validate(verb verb) error {
 	return nil
 }
 
-func (set *Set) writeOperation(verb verb, family Family, table string, writer io.Writer) {
+func (set *Set) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && set.Handle != nil {
-		fmt.Fprintf(writer, "delete set %s %s handle %d", family, table, *set.Handle)
+		fmt.Fprintf(writer, "delete set %s %s handle %d", ctx.family, ctx.table, *set.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s set %s %s %s", verb, family, table, set.Name)
+	fmt.Fprintf(writer, "%s set %s %s %s", verb, ctx.family, ctx.table, set.Name)
 	if verb == addVerb || verb == createVerb {
 		fmt.Fprintf(writer, " {")
 
@@ -227,7 +231,7 @@ func (set *Set) writeOperation(verb verb, family Family, table string, writer io
 			fmt.Fprintf(writer, " auto-merge ;")
 		}
 
-		if set.Comment != nil {
+		if set.Comment != nil && !ctx.noObjectComments {
 			fmt.Fprintf(writer, " comment %q ;", *set.Comment)
 		}
 
@@ -263,14 +267,14 @@ func (mapObj *Map) validate(verb verb) error {
 	return nil
 }
 
-func (mapObj *Map) writeOperation(verb verb, family Family, table string, writer io.Writer) {
+func (mapObj *Map) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && mapObj.Handle != nil {
-		fmt.Fprintf(writer, "delete map %s %s handle %d", family, table, *mapObj.Handle)
+		fmt.Fprintf(writer, "delete map %s %s handle %d", ctx.family, ctx.table, *mapObj.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s map %s %s %s", verb, family, table, mapObj.Name)
+	fmt.Fprintf(writer, "%s map %s %s %s", verb, ctx.family, ctx.table, mapObj.Name)
 	if verb == addVerb || verb == createVerb {
 		fmt.Fprintf(writer, " {")
 
@@ -304,7 +308,7 @@ func (mapObj *Map) writeOperation(verb verb, family Family, table string, writer
 			fmt.Fprintf(writer, " policy %s ;", *mapObj.Policy)
 		}
 
-		if mapObj.Comment != nil {
+		if mapObj.Comment != nil && !ctx.noObjectComments {
 			fmt.Fprintf(writer, " comment %q ;", *mapObj.Comment)
 		}
 
@@ -342,13 +346,13 @@ func (element *Element) validate(verb verb) error {
 	return nil
 }
 
-func (element *Element) writeOperation(verb verb, family Family, table string, writer io.Writer) {
+func (element *Element) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	name := element.Set
 	if name == "" {
 		name = element.Map
 	}
 
-	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, family, table, name,
+	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, ctx.family, ctx.table, name,
 		strings.Join(element.Key, " . "))
 
 	if verb == addVerb || verb == createVerb {
