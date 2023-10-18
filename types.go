@@ -21,6 +21,14 @@ import (
 	"time"
 )
 
+const (
+	// Maximum length of a table, chain, set, etc, name
+	NameLengthMax = 256
+
+	// Maximum length of a comment
+	CommentLengthMax = 128
+)
+
 // Object is the interface for an nftables object. All of the concrete object types
 // implement this interface.
 type Object interface {
