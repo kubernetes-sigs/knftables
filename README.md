@@ -1,4 +1,4 @@
-# golang nftables library
+# knftables: a golang nftables library
 
 This is a library for using nftables from Go.
 
@@ -17,7 +17,7 @@ Create an `Interface` object to manage operations on a single nftables
 table:
 
 ```golang
-nft, err := nftables.New(nftables.IPv4Family, "my-table")
+nft, err := knftables.New(knftables.IPv4Family, "my-table")
 if err != nil {
         return fmt.Errorf("no nftables support: %v", err)
 }
@@ -51,20 +51,20 @@ operations to the transaction, and then call `nft.Run` on it:
 ```golang
 tx := nft.NewTransaction()
 
-tx.Add(&nftables.Chain{
+tx.Add(&knftables.Chain{
         Name:    "mychain",
-        Comment: nftables.PtrTo("this is my chain"),
+        Comment: knftables.PtrTo("this is my chain"),
 })
-tx.Flush(&nftables.Chain{
+tx.Flush(&knftables.Chain{
         Name: "mychain",
 })
 
 var destIP net.IP
 var destPort uint16
 ...
-tx.Add(&nftables.Rule{
+tx.Add(&knftables.Rule{
         Chain: "mychain",
-        Rule:  nftables.Concat(
+        Rule: knftables.Concat(
                 "ip daddr", destIP,
                 "ip protocol", "tcp",
                 "th port", destPort,
@@ -77,13 +77,14 @@ err := nft.Run(context, tx)
 
 If any operation in the transaction would fail, then `Run()` will
 return an error and the entire transaction will be ignored. You can
-use the `nftables.IsNotFound()` and `nft.IsAlreadyExists()` methods to
-check for those well-known error types. In a large transaction, there
-is no supported way to determine exactly which operation failed.
+use the `knftables.IsNotFound()` and `knftables.IsAlreadyExists()`
+methods to check for those well-known error types. In a large
+transaction, there is no supported way to determine exactly which
+operation failed.
 
-## `nftables.Transaction` operations
+## `knftables.Transaction` operations
 
-`nftables.Transaction` operations correspond to the top-level commands
+`knftables.Transaction` operations correspond to the top-level commands
 in the `nft` binary. Currently-supported operations are:
 
 - `tx.Add()`: adds an object, which may already exist, as with `nft add`
@@ -95,7 +96,7 @@ in the `nft` binary. Currently-supported operations are:
 
 ## Objects
 
-The `Transaction` methods take arguments of type `nftables.Object`.
+The `Transaction` methods take arguments of type `knftables.Object`.
 The currently-supported objects are:
 
 - `Table`
@@ -114,11 +115,11 @@ arrays, and other arguments (including numbers, `net.IP`s /
 `fmt.Sprintf("%s")`) together into a single string. This is often
 useful when constructing `Rule`s.
 
-## `nftables.Fake`
+## `knftables.Fake`
 
-There is a fake (in-memory) implementation of `nftables.Interface` for
-use in unit tests. Use `nftables.NewFake()` instead of
-`nftables.New()` to create it, and then it should work mostly the
+There is a fake (in-memory) implementation of `knftables.Interface`
+for use in unit tests. Use `knftables.NewFake()` instead of
+`knftables.New()` to create it, and then it should work mostly the
 same. See `fake.go` for more details of the public APIs for examining
 the current state of the fake nftables database.
 
@@ -170,7 +171,7 @@ implemented with the ordinary plain-text API, while "read" operations
 are implemented with the JSON API, for parseability.
 
 The fact that the API uses functions and objects (e.g.
-`tx.Add(&nftables.Chain{...})`) rather than just specifying everything
+`tx.Add(&knftables.Chain{...})`) rather than just specifying everything
 as textual input to `nft` (e.g. `tx.Exec("add chain ...")`) is mostly
 just because it's _much_ easier to have a fake implementation for unit
 tests this way.
