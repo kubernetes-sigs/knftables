@@ -1,4 +1,4 @@
-module github.com/danwinship/nftables
+module github.com/danwinship/knftables
 
 go 1.20
 
