@@ -112,13 +112,25 @@ func TestObjects(t *testing.T) {
 			name:   "add base chain",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority)},
-			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; }`,
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; }`,
+		},
+		{
+			name:   "add base chain with priority math",
+			verb:   addVerb,
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority + "+5")},
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority 105 ; }`,
+		},
+		{
+			name:   "add base chain with unrecognized priority",
+			verb:   addVerb,
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(BaseChainPriority("futurevalue"))},
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority futurevalue ; }`,
 		},
 		{
 			name:   "add base chain with comment",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority), Comment: PtrTo("foo")},
-			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; comment "foo" ; }`,
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; comment "foo" ; }`,
 		},
 		{
 			name:   "create chain",
@@ -662,7 +674,7 @@ func TestNoObjectComments(t *testing.T) {
 		{
 			name:   "add base chain with comment",
 			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority), Comment: PtrTo("foo")},
-			out:    `add chain ip mytable mychain { type nat hook postrouting priority srcnat ; }`,
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; }`,
 		},
 		{
 			name:   "add rule with comment",

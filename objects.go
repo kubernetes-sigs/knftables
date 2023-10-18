@@ -95,7 +95,15 @@ func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 			fmt.Fprintf(writer, " {")
 
 			if chain.Type != nil {
-				fmt.Fprintf(writer, " type %s hook %s priority %s ;", *chain.Type, *chain.Hook, *chain.Priority)
+				// Parse the priority to a number if we can, because older
+				// versions of nft don't accept certain named priorities
+				// in all contexts (eg, "dstnat" priority in the "output"
+				// hook).
+				if priority, err := ParsePriority(ctx.family, string(*chain.Priority)); err == nil {
+					fmt.Fprintf(writer, " type %s hook %s priority %d ;", *chain.Type, *chain.Hook, priority)
+				} else {
+					fmt.Fprintf(writer, " type %s hook %s priority %s ;", *chain.Type, *chain.Hook, *chain.Priority)
+				}
 			}
 			if chain.Comment != nil && !ctx.noObjectComments {
 				fmt.Fprintf(writer, " comment %q ;", *chain.Comment)
