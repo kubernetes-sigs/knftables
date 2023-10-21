@@ -174,7 +174,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 
 		switch obj := op.obj.(type) {
 		case *Table:
-			err := checkExists(op.verb, "table", fake.table, fake.Table)
+			err := checkExists(op.verb, "table", fake.table, fake.Table != nil)
 			if err != nil {
 				return err
 			}
@@ -202,7 +202,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 
 		case *Chain:
 			existingChain := fake.Table.Chains[obj.Name]
-			err := checkExists(op.verb, "chain", obj.Name, existingChain)
+			err := checkExists(op.verb, "chain", obj.Name, existingChain != nil)
 			if err != nil {
 				return err
 			}
@@ -276,7 +276,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 
 		case *Set:
 			existingSet := fake.Table.Sets[obj.Name]
-			err := checkExists(op.verb, "set", obj.Name, existingSet)
+			err := checkExists(op.verb, "set", obj.Name, existingSet != nil)
 			if err != nil {
 				return err
 			}
@@ -300,7 +300,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			}
 		case *Map:
 			existingMap := fake.Table.Maps[obj.Name]
-			err := checkExists(op.verb, "map", obj.Name, existingMap)
+			err := checkExists(op.verb, "map", obj.Name, existingMap != nil)
 			if err != nil {
 				return err
 			}
@@ -384,17 +384,17 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 	return nil
 }
 
-func checkExists(verb verb, objectType, name string, existing Object) error {
+func checkExists(verb verb, objectType, name string, exists bool) error {
 	switch verb {
 	case addVerb:
 		// It's fine if the object either exists or doesn't
 		return nil
 	case createVerb:
-		if existing != nil {
+		if exists {
 			return existsError("%s %q already exists", objectType, name)
 		}
 	default:
-		if existing == nil {
+		if !exists {
 			return notFoundError("no such %s %q", objectType, name)
 		}
 	}
