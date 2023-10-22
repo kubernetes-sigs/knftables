@@ -19,10 +19,75 @@ package knftables
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+// fakeExec is a mockable implementation of execer for unit tests
+type fakeExec struct {
+	t *testing.T
+
+	// missingBinaries is the set of binaries for which LookPath should fail
+	missingBinaries map[string]bool
+
+	// expected is the list of expected Run calls
+	expected []expectedCmd
+
+	// matched is used internally, to keep track of where we are in expected
+	matched int
+}
+
+func newFakeExec(t *testing.T) *fakeExec {
+	return &fakeExec{t: t, missingBinaries: make(map[string]bool)}
+}
+
+func (fe *fakeExec) LookPath(file string) (string, error) {
+	if fe.missingBinaries[file] {
+		return "", &exec.Error{file, exec.ErrNotFound}
+	}
+	return "/" + file, nil
+}
+
+// expectedCmd details one expected fakeExec Cmd
+type expectedCmd struct {
+	args   []string
+	stdin  string
+	stdout string
+	err    error
+}
+
+func (fe *fakeExec) Run(cmd *exec.Cmd) (string, error) {
+	if fe.t.Failed() {
+		return "", fmt.Errorf("unit test failed")
+	}
+
+	if len(fe.expected) == fe.matched {
+		fe.t.Errorf("ran out of commands before executing %v", cmd.Args)
+		return "", fmt.Errorf("unit test failed")
+	}
+	expected := &fe.expected[fe.matched]
+	fe.matched++
+
+	if !reflect.DeepEqual(expected.args, cmd.Args) {
+		fe.t.Errorf("incorrect arguments: expected %v, got %v", expected.args, cmd.Args)
+		return "", fmt.Errorf("unit test failed")
+	}
+
+	var stdin string
+	if cmd.Stdin != nil {
+		inBytes, _ := io.ReadAll(cmd.Stdin)
+		stdin = string(inBytes)
+	}
+	if expected.stdin != stdin {
+		fe.t.Errorf("incorrect stdin: expected %q, got %q", expected.stdin, stdin)
+		return "", fmt.Errorf("unit test failed")
+	}
+
+	return expected.stdout, expected.err
+}
 
 type execTestCase struct {
 	name        string
