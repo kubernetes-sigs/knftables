@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"regexp"
 )
 
 // Interface is an interface for running nftables commands against a given family and table.
@@ -427,18 +426,4 @@ func parseElementValue(json interface{}) ([]string, error) {
 	}
 
 	return nil, fmt.Errorf("could not parse element value %q", json)
-}
-
-var commentRegexp = regexp.MustCompile(`^(.*) comment "([^"]*)"$`)
-
-// splitComment splits line into a required pre-comment and optional trailing comment
-// (which is enclosed in quotes but does not contain any quotes).
-func splitComment(line string) (string, *string) {
-	// We could perhaps do this more efficiently without using a regexp, but it would
-	// be more complicated...
-	match := commentRegexp.FindStringSubmatch(line)
-	if match != nil {
-		return match[1], &match[2]
-	}
-	return line, nil
 }
