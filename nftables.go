@@ -207,6 +207,8 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	if metainfo == nil {
 		return nil, fmt.Errorf("could not find metadata in nft output %q", listOutput)
 	}
+	// json_schema_version is an integer but `json.Unmarshal()` will have parsed it as
+	// a float64 since we didn't tell it otherwise.
 	if version, ok := jsonVal[float64](metainfo, "json_schema_version"); !ok || version != 1.0 {
 		return nil, fmt.Errorf("could not find supported json_schema_version in nft output %q", listOutput)
 	}
@@ -278,6 +280,11 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 			Chain: chain,
 		}
 
+		// handle is written as an integer in nft's output, but json.Unmarshal
+		// will have parsed it as a float64. (Handles are uint64s, but they are
+		// assigned consecutively starting from 1, so as long as fewer than 2**53
+		// nftables objects have been created since boot time, we won't run into
+		// float64-vs-uint64 precision issues.)
 		if handle, ok := jsonVal[float64](jsonRule, "handle"); ok {
 			rule.Handle = PtrTo(int(handle))
 		}
