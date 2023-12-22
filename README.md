@@ -143,10 +143,6 @@ for use in unit tests. Use `knftables.NewFake()` instead of
 same. See `fake.go` for more details of the public APIs for examining
 the current state of the fake nftables database.
 
-Note that at the present time, `fake.Run()` is not actually
-transactional, so unit tests that rely on things not being changed if
-a transaction fails partway through will not work as expected.
-
 ## Missing APIs
 
 Various top-level object types are not yet supported (notably the

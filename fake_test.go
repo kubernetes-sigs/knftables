@@ -223,11 +223,41 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("unexpected Dump content:\n%s", diff)
 	}
 
+	// Now try to re-delete the same element, and ensure that Run() behaves
+	// transactionally.
 	tx = fake.NewTransaction()
+	tx.Add(&Element{
+		Map:   "map1",
+		Key:   []string{"192.168.0.3", "tcp", "80"},
+		Value: []string{"accept"},
+	})
 	tx.Delete(ruleToDelete)
+	tx.Add(&Element{
+		Map:   "map1",
+		Key:   []string{"192.168.0.4", "tcp", "80"},
+		Value: []string{"accept"},
+	})
 	err = fake.Run(context.Background(), tx)
 	if err == nil || !IsNotFound(err) {
 		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	// Neither element should have been added
+	m = table.Maps["map1"]
+	if m == nil || len(table.Maps) != 1 {
+		t.Fatalf("unexpected contents of table.Maps: %+v", table.Maps)
+	}
+
+	elem = m.FindElement("192.168.0.3", "tcp", "80")
+	if elem != nil {
+		t.Errorf("element should not have been added: %+v", elem)
+	}
+	elem = m.FindElement("192.168.0.4", "tcp", "80")
+	if elem != nil {
+		t.Errorf("element should not have been added: %+v", elem)
+	}
+	if len(m.Elements) != 2 {
+		t.Errorf("unexpected contents of map1: %+v", m)
 	}
 }
 

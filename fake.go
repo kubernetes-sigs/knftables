@@ -158,11 +158,10 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		return tx.err
 	}
 
-	// FIXME: not actually transactional!
-
+	updatedTable := fake.Table.copy()
 	for _, op := range tx.operations {
 		// If the table hasn't been created, and this isn't a Table operation, then fail
-		if fake.Table == nil {
+		if updatedTable == nil {
 			if _, ok := op.obj.(*Table); !ok {
 				return notFoundError("no such table \"%s %s\"", fake.family, fake.table)
 			}
@@ -174,34 +173,34 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 
 		switch obj := op.obj.(type) {
 		case *Table:
-			err := checkExists(op.verb, "table", fake.table, fake.Table != nil)
+			err := checkExists(op.verb, "table", fake.table, updatedTable != nil)
 			if err != nil {
 				return err
 			}
 			switch op.verb {
 			case flushVerb:
-				fake.Table = nil
+				updatedTable = nil
 				fallthrough
 			case addVerb, createVerb:
-				if fake.Table != nil {
+				if updatedTable != nil {
 					continue
 				}
 				table := *obj
 				table.Handle = PtrTo(fake.nextHandle)
-				fake.Table = &FakeTable{
+				updatedTable = &FakeTable{
 					Table:  table,
 					Chains: make(map[string]*FakeChain),
 					Sets:   make(map[string]*FakeSet),
 					Maps:   make(map[string]*FakeMap),
 				}
 			case deleteVerb:
-				fake.Table = nil
+				updatedTable = nil
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 
 		case *Chain:
-			existingChain := fake.Table.Chains[obj.Name]
+			existingChain := updatedTable.Chains[obj.Name]
 			err := checkExists(op.verb, "chain", obj.Name, existingChain != nil)
 			if err != nil {
 				return err
@@ -213,20 +212,20 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				}
 				chain := *obj
 				chain.Handle = PtrTo(fake.nextHandle)
-				fake.Table.Chains[obj.Name] = &FakeChain{
+				updatedTable.Chains[obj.Name] = &FakeChain{
 					Chain: chain,
 				}
 			case flushVerb:
 				existingChain.Rules = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(fake.Table.Chains, obj.Name)
+				delete(updatedTable.Chains, obj.Name)
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 
 		case *Rule:
-			existingChain := fake.Table.Chains[obj.Chain]
+			existingChain := updatedTable.Chains[obj.Chain]
 			if existingChain == nil {
 				return notFoundError("no such chain %q", obj.Chain)
 			}
@@ -275,7 +274,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 			}
 
 		case *Set:
-			existingSet := fake.Table.Sets[obj.Name]
+			existingSet := updatedTable.Sets[obj.Name]
 			err := checkExists(op.verb, "set", obj.Name, existingSet != nil)
 			if err != nil {
 				return err
@@ -287,19 +286,19 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				}
 				set := *obj
 				set.Handle = PtrTo(fake.nextHandle)
-				fake.Table.Sets[obj.Name] = &FakeSet{
+				updatedTable.Sets[obj.Name] = &FakeSet{
 					Set: set,
 				}
 			case flushVerb:
 				existingSet.Elements = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(fake.Table.Sets, obj.Name)
+				delete(updatedTable.Sets, obj.Name)
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Map:
-			existingMap := fake.Table.Maps[obj.Name]
+			existingMap := updatedTable.Maps[obj.Name]
 			err := checkExists(op.verb, "map", obj.Name, existingMap != nil)
 			if err != nil {
 				return err
@@ -311,20 +310,20 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 				}
 				mapObj := *obj
 				mapObj.Handle = PtrTo(fake.nextHandle)
-				fake.Table.Maps[obj.Name] = &FakeMap{
+				updatedTable.Maps[obj.Name] = &FakeMap{
 					Map: mapObj,
 				}
 			case flushVerb:
 				existingMap.Elements = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(fake.Table.Maps, obj.Name)
+				delete(updatedTable.Maps, obj.Name)
 			default:
 				return fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Element:
 			if len(obj.Value) == 0 {
-				existingSet := fake.Table.Sets[obj.Set]
+				existingSet := updatedTable.Sets[obj.Set]
 				if existingSet == nil {
 					return notFoundError("no such set %q", obj.Set)
 				}
@@ -350,7 +349,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 					return fmt.Errorf("unhandled operation %q", op.verb)
 				}
 			} else {
-				existingMap := fake.Table.Maps[obj.Map]
+				existingMap := updatedTable.Maps[obj.Map]
 				if existingMap == nil {
 					return notFoundError("no such map %q", obj.Map)
 				}
@@ -381,6 +380,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 		}
 	}
 
+	fake.Table = updatedTable
 	return nil
 }
 
@@ -472,6 +472,41 @@ func findElement(elements []*Element, key []string) int {
 		}
 	}
 	return -1
+}
+
+// copy creates a copy of table with new arrays/maps so we can perform a transaction
+// on it without changing the original table.
+func (table *FakeTable) copy() *FakeTable {
+	if table == nil {
+		return nil
+	}
+
+	copy := &FakeTable{
+		Table:  table.Table,
+		Chains: make(map[string]*FakeChain),
+		Sets:   make(map[string]*FakeSet),
+		Maps:   make(map[string]*FakeMap),
+	}
+	for name, chain := range table.Chains {
+		copy.Chains[name] = &FakeChain{
+			Chain: chain.Chain,
+			Rules: append([]*Rule{}, chain.Rules...),
+		}
+	}
+	for name, set := range table.Sets {
+		copy.Sets[name] = &FakeSet{
+			Set:      set.Set,
+			Elements: append([]*Element{}, set.Elements...),
+		}
+	}
+	for name, mapObj := range table.Maps {
+		copy.Maps[name] = &FakeMap{
+			Map:      mapObj.Map,
+			Elements: append([]*Element{}, mapObj.Elements...),
+		}
+	}
+
+	return copy
 }
 
 // FindElement finds an element of the set with the given key. If there is no matching
