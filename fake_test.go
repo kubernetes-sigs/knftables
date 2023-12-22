@@ -261,6 +261,69 @@ func TestFakeRun(t *testing.T) {
 	}
 }
 
+func TestFakeCheck(t *testing.T) {
+	fake := NewFake(IPv4Family, "kube-proxy")
+
+	tx := fake.NewTransaction()
+
+	tx.Add(&Table{})
+	tx.Add(&Chain{
+		Name:    "chain",
+		Comment: PtrTo("foo"),
+	})
+	tx.Add(&Rule{
+		Chain: "chain",
+		Rule:  "ip daddr 10.0.0.0/8 drop",
+	})
+	tx.Add(&Rule{
+		Chain:   "chain",
+		Rule:    "masquerade",
+		Comment: PtrTo("comment"),
+	})
+
+	// The transaction should contain exactly those commands, in order
+	expected := strings.TrimPrefix(dedent.Dedent(`
+		add table ip kube-proxy
+		add chain ip kube-proxy chain { comment "foo" ; }
+		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add rule ip kube-proxy chain masquerade comment "comment"
+		`), "\n")
+	diff := cmp.Diff(expected, tx.String())
+	if diff != "" {
+		t.Errorf("unexpected transaction content:\n%s", diff)
+	}
+
+	err := fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	// Checking if we can delete an existing chain should succeed (and not delete the
+	// chain)
+	tx = fake.NewTransaction()
+	tx.Delete(&Chain{
+		Name: "chain",
+	})
+	err = fake.Check(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Check: %v", err)
+	}
+	chain := fake.Table.Chains["chain"]
+	if chain == nil || len(fake.Table.Chains) != 1 {
+		t.Fatalf("unexpected contents of table.Chains: %+v", fake.Table.Chains)
+	}
+
+	// Checking if we can delete an non-existent chain should fail
+	tx = fake.NewTransaction()
+	tx.Delete(&Chain{
+		Name: "another-chain",
+	})
+	err = fake.Check(context.Background(), tx)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("unexpected error from Check: %v", err)
+	}
+}
+
 func assertRules(t *testing.T, fake *Fake, expected ...string) {
 	t.Helper()
 

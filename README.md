@@ -41,7 +41,10 @@ if err != nil {
 ```
 
 (If you want to operate on multiple tables or multiple nftables
-families, you will need separate `Interface` objects for each.)
+families, you will need separate `Interface` objects for each. If you
+need to check whether the system supports an nftables feature as with
+`nft --check`, use `nft.Check()`, which works the same as `nft.Run()`
+below.)
 
 You can use the `List`, `ListRules`, and `ListElements` methods on the
 `Interface` to check if objects exist. `List` returns the names of

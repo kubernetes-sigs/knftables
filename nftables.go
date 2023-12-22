@@ -32,6 +32,11 @@ type Interface interface {
 	// IsAlreadyExists methods can be used to test the result.
 	Run(ctx context.Context, tx *Transaction) error
 
+	// Check does a dry-run of a Transaction (as with `nft --check`) and returns the
+	// result. The IsNotFound and IsAlreadyExists methods can be used to test the
+	// result.
+	Check(ctx context.Context, tx *Transaction) error
+
 	// List returns a list of the names of the objects of objectType ("chain", "set",
 	// or "map") in the table. If there are no such objects, this will return an empty
 	// list and no error.
@@ -126,6 +131,23 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 	}
 
 	cmd := exec.CommandContext(ctx, nft.path, "-f", "-")
+	cmd.Stdin = buf
+	_, err = nft.exec.Run(cmd)
+	return err
+}
+
+// Check is part of Interface
+func (nft *realNFTables) Check(ctx context.Context, tx *Transaction) error {
+	if tx.err != nil {
+		return tx.err
+	}
+
+	buf, err := tx.asCommandBuf()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.CommandContext(ctx, nft.path, "--check", "-f", "-")
 	cmd.Stdin = buf
 	_, err = nft.exec.Run(cmd)
 	return err
