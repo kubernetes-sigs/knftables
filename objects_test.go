@@ -133,6 +133,12 @@ func TestObjects(t *testing.T) {
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; comment "foo" ; }`,
 		},
 		{
+			name:   "add base chain with device",
+			verb:   addVerb,
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(IngressHook), Device: PtrTo("eth0"), Priority: PtrTo(SNATPriority)},
+			out:    `add chain ip mytable mychain { type nat hook ingress device "eth0" priority 100 ; }`,
+		},
+		{
 			name:   "create chain",
 			verb:   createVerb,
 			object: &Chain{Name: "mychain"},
@@ -221,6 +227,12 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Priority: PtrTo(SNATPriority)},
 			err:    "must not specify Type or Priority",
+		},
+		{
+			name:   "invalid add non-base chain with device",
+			verb:   addVerb,
+			object: &Chain{Name: "mychain", Device: PtrTo("eth0")},
+			err:    "must not specify Device",
 		},
 
 		// Rules

@@ -166,6 +166,11 @@ type Chain struct {
 	// a regular chain. You can call ParsePriority() to convert this to a number.
 	Priority *BaseChainPriority
 
+	// Device is the network interface that the chain is attached to; this must be set
+	// for a base chain connected to the "ingress" or "egress" hooks, and unset for
+	// all other chains.
+	Device *string
+
 	// Comment is an optional comment for the object.  (Requires kernel >= 5.10 and
 	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
 	// nft >= 1.0.8 to include comments in List() results.)
