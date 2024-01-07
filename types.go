@@ -67,9 +67,9 @@ const (
 
 // Table represents an nftables table.
 type Table struct {
-	// Comment is an optional comment for the table. (Note that this can be specified
-	// on creation, but depending on the version of /sbin/nft that is available, it
-	// may not be filled in correctly in the result of a List.)
+	// Comment is an optional comment for the table. (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
+	// nft >= 1.0.8 to include comments in List() results.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
@@ -166,7 +166,9 @@ type Chain struct {
 	// a regular chain. You can call ParsePriority() to convert this to a number.
 	Priority *BaseChainPriority
 
-	// Comment is an optional comment for the object.
+	// Comment is an optional comment for the object.  (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
+	// nft >= 1.0.8 to include comments in List() results.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
@@ -243,7 +245,8 @@ type Set struct {
 	Type string
 
 	// TypeOf is the type of the set key as an nftables expression (eg "ip saddr").
-	// Either Type or TypeOf, but not both, must be non-empty.
+	// Either Type or TypeOf, but not both, must be non-empty. (Requires at least nft
+	// 0.9.4, and newer than that for some types.)
 	TypeOf string
 
 	// Flags are the set flags
@@ -268,7 +271,8 @@ type Set struct {
 	// together (only for interval sets)
 	AutoMerge *bool
 
-	// Comment is an optional comment for the object.
+	// Comment is an optional comment for the object.  (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
@@ -286,7 +290,8 @@ type Map struct {
 	Type string
 
 	// TypeOf is the type of the set key as an nftables expression (eg "ip saddr : verdict").
-	// Either Type or TypeOf, but not both, must be non-empty.
+	// Either Type or TypeOf, but not both, must be non-empty. (Requires at least nft 0.9.4,
+	// and newer than that for some types.)
 	TypeOf string
 
 	// Flags are the map flags
@@ -307,7 +312,8 @@ type Map struct {
 	// Policy is the FIXME
 	Policy *SetPolicy
 
-	// Comment is an optional comment for the object.
+	// Comment is an optional comment for the object.  (Requires kernel >= 5.10 and
+	// nft >= 0.9.7; otherwise this field will be silently ignored.)
 	Comment *string
 
 	// Handle is an identifier that can be used to uniquely identify an object when
