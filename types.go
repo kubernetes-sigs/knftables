@@ -77,7 +77,8 @@ type Table struct {
 	Handle *int
 }
 
-// BaseChainType represents the "type" of a "base chain" (ie, a chain that is attached to a hook)
+// BaseChainType represents the "type" of a "base chain" (ie, a chain that is attached to a hook).
+// See https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_types
 type BaseChainType string
 
 const (
@@ -93,24 +94,52 @@ const (
 	RouteType BaseChainType = "route"
 )
 
-// BaseChainHook represents the "hook" that a base chain is attached to
+// BaseChainHook represents the "hook" that a base chain is attached to.
+// See https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_hooks
+// and https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks
 type BaseChainHook string
 
-// FIXME: document these correctly; virtually all of the existing iptables/nftables
-// documentation is slightly wrong, particular wrt locally-generated packets.
 const (
-	PreroutingHook  BaseChainHook = "prerouting"
-	InputHook       BaseChainHook = "input"
-	ForwardHook     BaseChainHook = "forward"
-	OutputHook      BaseChainHook = "output"
+	// PreroutingHook is the "prerouting" stage of packet processing, which is the
+	// first stage (after "ingress") for inbound ("input path" and "forward path")
+	// packets.
+	PreroutingHook BaseChainHook = "prerouting"
+
+	// InputHook is the "input" stage of packet processing, which happens after
+	// "prerouting" for inbound packets being delivered to an interface on this host,
+	// in this network namespace.
+	InputHook BaseChainHook = "input"
+
+	// ForwardHook is the "forward" stage of packet processing, which happens after
+	// "prerouting" for inbound packets destined for a non-local IP (i.e. on another
+	// host or in another network namespace)
+	ForwardHook BaseChainHook = "forward"
+
+	// OutputHook is the "output" stage of packet processing, which is the first stage
+	// for outbound packets, regardless of their final destination.
+	OutputHook BaseChainHook = "output"
+
+	// PostroutingHook is the "postrouting" stage of packet processing, which is the
+	// final stage (before "egress") for outbound ("forward path" and "output path")
+	// packets.
 	PostroutingHook BaseChainHook = "postrouting"
-	IngressHook     BaseChainHook = "ingress"
-	EgressHook      BaseChainHook = "egress"
+
+	// IngressHook is the "ingress" stage of packet processing, in the "netdev" family
+	// or (with kernel >= 5.10 and nft >= 0.9.7) the "inet" family.
+	IngressHook BaseChainHook = "ingress"
+
+	// EgressHook is the "egress" stage of packet processing, in the "netdev" family
+	// (with kernel >= 5.16 and nft >= 1.0.1).
+	EgressHook BaseChainHook = "egress"
 )
 
-// BaseChainPriority represents the "priority" of a base chain. In addition to the const
-// values, you can also use a signed integer value, or an arithmetic expression consisting
-// of a const value followed by "+" or "-" and an integer. Lower values run earlier.
+// BaseChainPriority represents the "priority" of a base chain. Lower values run earlier.
+// See https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_priority
+// and https://wiki.nftables.org/wiki-nftables/index.php/Netfilter_hooks#Priority_within_hook
+//
+// In addition to the const values, you can also use a signed integer value, or an
+// arithmetic expression consisting of a const value followed by "+" or "-" and an
+// integer.
 type BaseChainPriority string
 
 const (
