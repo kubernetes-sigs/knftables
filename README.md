@@ -254,3 +254,14 @@ tx.Add(&knftables.Rule{
 
 This will presumably require a change to `knftables.Rule` and/or
 `knftables.Concat()` but I'm not sure exactly what it will be.
+
+## Community, discussion, contribution, and support
+
+knftables is maintained by [Kubernetes SIG Network](https://github.com/kubernetes/community/tree/master/sig-network).
+
+- [sig-network slack channel](https://kubernetes.slack.com/messages/sig-network)
+- [kubernetes-sig-network mailing list](https://groups.google.com/forum/#!forum/kubernetes-sig-network)
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more information about
+contributing. Participation in the Kubernetes community is governed by
+the [Kubernetes Code of Conduct](code-of-conduct.md).
