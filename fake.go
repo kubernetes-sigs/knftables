@@ -414,9 +414,7 @@ func checkExists(verb verb, objectType, name string, exists bool) error {
 	return nil
 }
 
-// Dump dumps the current contents of fake, in a way that looks like an nft transaction,
-// but not actually guaranteed to be usable as such. (e.g., chains may be referenced
-// before they are created, etc)
+// Dump dumps the current contents of fake, in a way that looks like an nft transaction.
 func (fake *Fake) Dump() string {
 	if fake.Table == nil {
 		return ""
@@ -425,12 +423,30 @@ func (fake *Fake) Dump() string {
 	buf := &strings.Builder{}
 
 	table := fake.Table
-	table.writeOperation(addVerb, &fake.nftContext, buf)
+	chains := sortKeys(table.Chains)
+	sets := sortKeys(table.Sets)
+	maps := sortKeys(table.Maps)
 
-	for _, cname := range sortKeys(table.Chains) {
+	// Write out all of the object adds first.
+
+	table.writeOperation(addVerb, &fake.nftContext, buf)
+	for _, cname := range chains {
 		ch := table.Chains[cname]
 		ch.writeOperation(addVerb, &fake.nftContext, buf)
+	}
+	for _, sname := range sets {
+		s := table.Sets[sname]
+		s.writeOperation(addVerb, &fake.nftContext, buf)
+	}
+	for _, mname := range maps {
+		m := table.Maps[mname]
+		m.writeOperation(addVerb, &fake.nftContext, buf)
+	}
 
+	// Now write their contents.
+
+	for _, cname := range chains {
+		ch := table.Chains[cname]
 		for _, rule := range ch.Rules {
 			// Avoid outputing handles
 			dumpRule := *rule
@@ -439,19 +455,14 @@ func (fake *Fake) Dump() string {
 			dumpRule.writeOperation(addVerb, &fake.nftContext, buf)
 		}
 	}
-
-	for _, sname := range sortKeys(table.Sets) {
+	for _, sname := range sets {
 		s := table.Sets[sname]
-		s.writeOperation(addVerb, &fake.nftContext, buf)
-
 		for _, element := range s.Elements {
 			element.writeOperation(addVerb, &fake.nftContext, buf)
 		}
 	}
-	for _, mname := range sortKeys(table.Maps) {
+	for _, mname := range maps {
 		m := table.Maps[mname]
-		m.writeOperation(addVerb, &fake.nftContext, buf)
-
 		for _, element := range m.Elements {
 			element.writeOperation(addVerb, &fake.nftContext, buf)
 		}

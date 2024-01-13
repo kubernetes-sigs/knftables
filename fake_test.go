@@ -170,12 +170,12 @@ func TestFakeRun(t *testing.T) {
 	expected = strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
 		add chain ip kube-proxy anotherchain
+		add chain ip kube-proxy chain { comment "foo" ; }
+		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
-		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
 		add rule ip kube-proxy chain masquerade comment "comment"
-		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
@@ -210,11 +210,11 @@ func TestFakeRun(t *testing.T) {
 	expected = strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
 		add chain ip kube-proxy anotherchain
+		add chain ip kube-proxy chain { comment "foo" ; }
+		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
-		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
-		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
