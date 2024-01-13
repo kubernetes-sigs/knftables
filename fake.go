@@ -266,6 +266,10 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				refRule = *obj.Index
 			}
 
+			if err := checkRuleRefs(obj, updatedTable); err != nil {
+				return nil, err
+			}
+
 			switch op.verb {
 			case addVerb:
 				if refRule == -1 {
@@ -367,6 +371,9 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				if existingMap == nil {
 					return nil, notFoundError("no such map %q", obj.Map)
 				}
+				if err := checkElementRefs(obj, updatedTable); err != nil {
+					return nil, err
+				}
 				switch op.verb {
 				case addVerb, createVerb:
 					element := *obj
@@ -409,6 +416,47 @@ func checkExists(verb verb, objectType, name string, exists bool) error {
 	default:
 		if !exists {
 			return notFoundError("no such %s %q", objectType, name)
+		}
+	}
+	return nil
+}
+
+// checkRuleRefs checks for chains, sets, and maps referenced by rule in table
+func checkRuleRefs(rule *Rule, table *FakeTable) error {
+	words := strings.Split(rule.Rule, " ")
+	for i, word := range words {
+		if strings.HasPrefix(word, "@") {
+			name := word[1:]
+			if i > 0 && (words[i] == "map" || words[i] == "vmap") {
+				if table.Maps[name] == nil {
+					return notFoundError("no such map %q", name)
+				}
+			} else {
+				// recent nft lets you use a map in a set lookup
+				if table.Sets[name] == nil && table.Maps[name] == nil {
+					return notFoundError("no such set %q", name)
+				}
+			}
+		} else if (word == "goto" || word == "jump") && i < len(words)-1 {
+			name := words[i+1]
+			if table.Chains[name] == nil {
+				return notFoundError("no such chain %q", name)
+			}
+		}
+	}
+	return nil
+}
+
+// checkElementRefs checks for chains referenced by an element
+func checkElementRefs(element *Element, table *FakeTable) error {
+	if len(element.Value) != 1 {
+		return nil
+	}
+	words := strings.Split(element.Value[0], " ")
+	if len(words) == 2 && (words[0] == "goto" || words[0] == "jump") {
+		name := words[1]
+		if table.Chains[name] == nil {
+			return notFoundError("no such chain %q", name)
 		}
 	}
 	return nil

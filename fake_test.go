@@ -259,6 +259,48 @@ func TestFakeRun(t *testing.T) {
 	if len(m.Elements) != 2 {
 		t.Errorf("unexpected contents of map1: %+v", m)
 	}
+
+	// Ensure that we can't add things that refer to non-existing things
+	tx = fake.NewTransaction()
+	tx.Add(&Rule{
+		Chain: "chain",
+		Rule:  "tcp dport 80 goto missingchain",
+	})
+	err = fake.Run(context.Background(), tx)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	tx = fake.NewTransaction()
+	tx.Add(&Rule{
+		Chain: "chain",
+		Rule:  "tcp dport 80 vmap @missingmap",
+	})
+	err = fake.Run(context.Background(), tx)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	tx = fake.NewTransaction()
+	tx.Add(&Rule{
+		Chain: "chain",
+		Rule:  "tcp dport @missingset drop",
+	})
+	err = fake.Run(context.Background(), tx)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	tx = fake.NewTransaction()
+	tx.Add(&Element{
+		Map:   "map1",
+		Key:   []string{"192.168.0.5", "tcp", "80"},
+		Value: []string{"jump missingchain"},
+	})
+	err = fake.Run(context.Background(), tx)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
 }
 
 func TestFakeCheck(t *testing.T) {
