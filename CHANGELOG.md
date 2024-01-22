@@ -2,6 +2,9 @@
 
 ## HEAD
 
+- Renamed the package `"sigs.k8s.io/knftables"`, reflecting its new
+  home at https://github.com/kubernetes-sigs/knftables/
+
 - Improvements to `Fake`:
 
     - `Fake.Run()` is now properly transactional, and will have no

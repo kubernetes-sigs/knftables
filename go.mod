@@ -1,4 +1,4 @@
-module github.com/danwinship/knftables
+module sigs.k8s.io/knftables
 
 go 1.20
 
