@@ -1,6 +1,6 @@
 # ChangeLog
 
-## HEAD
+## v0.0.14
 
 - Renamed the package `"sigs.k8s.io/knftables"`, reflecting its new
   home at https://github.com/kubernetes-sigs/knftables/
