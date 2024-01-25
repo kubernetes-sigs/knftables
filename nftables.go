@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // Interface is an interface for running nftables commands against a given family and table.
@@ -91,17 +92,29 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 		return nil, fmt.Errorf("could not find nftables binary: %w", err)
 	}
 
-	cmd := exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table)
-	_, err = nft.exec.Run(cmd)
+	cmd := exec.Command(nft.path, "--version")
+	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("could not run nftables command: %w", err)
 	}
+	if strings.HasPrefix(out, "nftables v0.") || strings.HasPrefix(out, "nftables v1.0.0 ") {
+		return nil, fmt.Errorf("nft version must be v1.0.1 or later (got %s)", strings.TrimSpace(out))
+	}
 
+	// Check that (a) nft works, (b) we have permission, (c) the kernel is new enough
+	// to support object comments.
 	cmd = exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table,
 		"{", "comment", `"test"`, "}",
 	)
 	_, err = nft.exec.Run(cmd)
 	if err != nil {
+		// Try again, checking just that (a) nft works, (b) we have permission.
+		cmd := exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table)
+		_, err = nft.exec.Run(cmd)
+		if err != nil {
+			return nil, fmt.Errorf("could not run nftables command: %w", err)
+		}
+
 		nft.noObjectComments = true
 	}
 
