@@ -159,10 +159,9 @@ func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 	if ifVal, exists := json[key]; exists {
 		tVal, ok := ifVal.(T)
 		return tVal, ok
-	} else {
-		var zero T
-		return zero, false
 	}
+	var zero T
+	return zero, false
 }
 
 // getJSONObjects takes the output of "nft -j list", validates it, and returns an array
@@ -222,7 +221,7 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	}
 
 	nftablesResult := jsonResult["nftables"]
-	if nftablesResult == nil || len(nftablesResult) == 0 {
+	if len(nftablesResult) == 0 {
 		return nil, fmt.Errorf("could not find result in nft output %q", listOutput)
 	}
 	metainfo := nftablesResult[0]["metainfo"]
