@@ -46,7 +46,7 @@ func newFakeExec(t *testing.T) *fakeExec {
 
 func (fe *fakeExec) LookPath(file string) (string, error) {
 	if fe.missingBinaries[file] {
-		return "", &exec.Error{file, exec.ErrNotFound}
+		return "", &exec.Error{Name: file, Err: exec.ErrNotFound}
 	}
 	return "/" + file, nil
 }

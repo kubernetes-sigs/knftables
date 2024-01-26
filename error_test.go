@@ -71,7 +71,7 @@ func TestError(t *testing.T) {
 		},
 		{
 			name:       "not an ExecError, so not interpreted",
-			err:        wrapError(fmt.Errorf("Error: No such file or directory\ndelete element ip nosuchtable set {10.0.0.1}\n                  ^^^^^^^^^^^\n")),
+			err:        wrapError(fmt.Errorf("Error: No such file or directory\ndelete element ip nosuchtable set {10.0.0.1}\n                  ^^^^^^^^^^^\n")), //nolint:revive
 			isNotFound: false,
 			isExists:   false,
 		},

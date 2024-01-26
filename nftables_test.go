@@ -29,12 +29,16 @@ import (
 
 func newTestInterface(t *testing.T, family Family, tableName string) (Interface, *fakeExec, error) {
 	fexec := newFakeExec(t)
+	ip := "ip"
+	if family == IPv6Family {
+		ip = "ip6"
+	}
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
-			args: []string{"/nft", "--check", "add", "table", "ip", tableName},
+			args: []string{"/nft", "--check", "add", "table", ip, tableName},
 		},
 		expectedCmd{
-			args: []string{"/nft", "--check", "add", "table", "ip", tableName,
+			args: []string{"/nft", "--check", "add", "table", ip, tableName,
 				"{", "comment", `"test"`, "}",
 			},
 		},
@@ -103,11 +107,11 @@ func TestListBad(t *testing.T) {
 				nftErr = fmt.Errorf(tc.nftError)
 			}
 
-			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
+			nft, fexec, _ := newTestInterface(t, IPv6Family, "testing")
 
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"/nft", "--json", "list", "chains", "ip"},
+					args:   []string{"/nft", "--json", "list", "chains", "ip6"},
 					stdout: tc.nftOutput,
 					err:    nftErr,
 				},

@@ -88,7 +88,7 @@ func NewFake(family Family, table string) *Fake {
 var _ Interface = &Fake{}
 
 // List is part of Interface.
-func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error) {
+func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 	if fake.Table == nil {
 		return nil, notFoundError("no such table %q", fake.table)
 	}
@@ -117,7 +117,7 @@ func (fake *Fake) List(ctx context.Context, objectType string) ([]string, error)
 }
 
 // ListRules is part of Interface
-func (fake *Fake) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
+func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
 	if fake.Table == nil {
 		return nil, notFoundError("no such chain %q", chain)
 	}
@@ -129,7 +129,7 @@ func (fake *Fake) ListRules(ctx context.Context, chain string) ([]*Rule, error) 
 }
 
 // ListElements is part of Interface
-func (fake *Fake) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
+func (fake *Fake) ListElements(_ context.Context, objectType, name string) ([]*Element, error) {
 	if fake.Table == nil {
 		return nil, notFoundError("no such %s %q", objectType, name)
 	}
@@ -153,7 +153,7 @@ func (fake *Fake) NewTransaction() *Transaction {
 }
 
 // Run is part of Interface
-func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
+func (fake *Fake) Run(_ context.Context, tx *Transaction) error {
 	updatedTable, err := fake.run(tx)
 	if err == nil {
 		fake.Table = updatedTable
@@ -162,7 +162,7 @@ func (fake *Fake) Run(ctx context.Context, tx *Transaction) error {
 }
 
 // Check is part of Interface
-func (fake *Fake) Check(ctx context.Context, tx *Transaction) error {
+func (fake *Fake) Check(_ context.Context, tx *Transaction) error {
 	_, err := fake.run(tx)
 	return err
 }
@@ -553,32 +553,32 @@ func (table *FakeTable) copy() *FakeTable {
 		return nil
 	}
 
-	copy := &FakeTable{
+	tcopy := &FakeTable{
 		Table:  table.Table,
 		Chains: make(map[string]*FakeChain),
 		Sets:   make(map[string]*FakeSet),
 		Maps:   make(map[string]*FakeMap),
 	}
 	for name, chain := range table.Chains {
-		copy.Chains[name] = &FakeChain{
+		tcopy.Chains[name] = &FakeChain{
 			Chain: chain.Chain,
 			Rules: append([]*Rule{}, chain.Rules...),
 		}
 	}
 	for name, set := range table.Sets {
-		copy.Sets[name] = &FakeSet{
+		tcopy.Sets[name] = &FakeSet{
 			Set:      set.Set,
 			Elements: append([]*Element{}, set.Elements...),
 		}
 	}
 	for name, mapObj := range table.Maps {
-		copy.Maps[name] = &FakeMap{
+		tcopy.Maps[name] = &FakeMap{
 			Map:      mapObj.Map,
 			Elements: append([]*Element{}, mapObj.Elements...),
 		}
 	}
 
-	return copy
+	return tcopy
 }
 
 // FindElement finds an element of the set with the given key. If there is no matching
