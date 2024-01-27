@@ -16,7 +16,6 @@ linters:
     # additional lints
     - errorlint
     - exportloopref
-    - gci
     - gochecknoinits
     - gofmt
     - misspell
