@@ -74,7 +74,8 @@ type realNFTables struct {
 	path string
 }
 
-// for unit tests
+// newInternal creates a new nftables.Interface for interacting with the given table; this
+// is split out from New() so it can be used from unit tests with a fakeExec.
 func newInternal(family Family, table string, execer execer) (Interface, error) {
 	var err error
 
