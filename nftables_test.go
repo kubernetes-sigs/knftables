@@ -35,7 +35,8 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 	}
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
-			args: []string{"/nft", "--check", "add", "table", ip, tableName},
+			args:   []string{"/nft", "--version"},
+			stdout: "nftables v1.0.7 (Old Doc Yak)\n",
 		},
 		expectedCmd{
 			args: []string{"/nft", "--check", "add", "table", ip, tableName,
@@ -420,16 +421,28 @@ func TestFeatures(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		commands []expectedCmd
-		result   nftContext
+		result   *nftContext
 	}{
+		{
+			name: "old nftables",
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--version",
+					},
+					stdout: "nftables v0.9.3 (Topsy)\n",
+				},
+			},
+			result: nil,
+		},
 		{
 			name: "all features",
 			commands: []expectedCmd{
 				{
 					args: []string{
-						"/nft", "--check",
-						"add", "table", "ip", "testing",
+						"/nft", "--version",
 					},
+					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
 				},
 				{
 					args: []string{
@@ -439,7 +452,7 @@ func TestFeatures(t *testing.T) {
 					},
 				},
 			},
-			result: nftContext{
+			result: &nftContext{
 				family: IPv4Family,
 				table:  "testing",
 			},
@@ -449,9 +462,9 @@ func TestFeatures(t *testing.T) {
 			commands: []expectedCmd{
 				{
 					args: []string{
-						"/nft", "--check",
-						"add", "table", "ip", "testing",
+						"/nft", "--version",
 					},
+					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
 				},
 				{
 					args: []string{
@@ -461,8 +474,14 @@ func TestFeatures(t *testing.T) {
 					},
 					err: fmt.Errorf("Error: syntax error, unexpected comment"),
 				},
+				{
+					args: []string{
+						"/nft", "--check",
+						"add", "table", "ip", "testing",
+					},
+				},
 			},
-			result: nftContext{
+			result: &nftContext{
 				family: IPv4Family,
 				table:  "testing",
 
@@ -475,11 +494,18 @@ func TestFeatures(t *testing.T) {
 			fexec.expected = tc.commands
 			nft, err := newInternal(IPv4Family, "testing", fexec)
 			if err != nil {
-				t.Fatalf("Unexpected error creating Interface: %v", err)
-			}
-			result := nft.(*realNFTables).nftContext
-			if !reflect.DeepEqual(tc.result, result) {
-				t.Errorf("Expected %#v, got %#v", tc.result, result)
+				if tc.result != nil {
+					t.Fatalf("Unexpected error creating Interface: %v", err)
+				}
+			} else {
+				result := nft.(*realNFTables).nftContext
+				if tc.result != nil {
+					if !reflect.DeepEqual(*tc.result, result) {
+						t.Errorf("Expected %#v, got %#v", *tc.result, result)
+					}
+				} else {
+					t.Fatalf("Expected failure, got %#v", result)
+				}
 			}
 		})
 	}
