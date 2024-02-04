@@ -39,9 +39,8 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 			stdout: "nftables v1.0.7 (Old Doc Yak)\n",
 		},
 		expectedCmd{
-			args: []string{"/nft", "--check", "add", "table", ip, tableName,
-				"{", "comment", `"test"`, "}",
-			},
+			args:  []string{"/nft", "--check", "-f", "-"},
+			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", ip, tableName),
 		},
 	)
 	nft, err := newInternal(family, tableName, fexec)
@@ -445,11 +444,8 @@ func TestFeatures(t *testing.T) {
 					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
 				},
 				{
-					args: []string{
-						"/nft", "--check",
-						"add", "table", "ip", "testing",
-						"{", "comment", `"test"`, "}",
-					},
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing { comment \"test\" ; }\n",
 				},
 			},
 			result: &nftContext{
@@ -467,18 +463,13 @@ func TestFeatures(t *testing.T) {
 					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
 				},
 				{
-					args: []string{
-						"/nft", "--check",
-						"add", "table", "ip", "testing",
-						"{", "comment", `"test"`, "}",
-					},
-					err: fmt.Errorf("Error: syntax error, unexpected comment"),
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing { comment \"test\" ; }\n",
+					err:   fmt.Errorf("Error: syntax error, unexpected comment"),
 				},
 				{
-					args: []string{
-						"/nft", "--check",
-						"add", "table", "ip", "testing",
-					},
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing\n",
 				},
 			},
 			result: &nftContext{

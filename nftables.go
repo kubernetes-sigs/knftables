@@ -104,15 +104,15 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 
 	// Check that (a) nft works, (b) we have permission, (c) the kernel is new enough
 	// to support object comments.
-	cmd = exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table,
-		"{", "comment", `"test"`, "}",
-	)
-	_, err = nft.exec.Run(cmd)
-	if err != nil {
+	tx := nft.NewTransaction()
+	tx.Add(&Table{
+		Comment: PtrTo("test"),
+	})
+	if err := nft.Check(context.TODO(), tx); err != nil {
 		// Try again, checking just that (a) nft works, (b) we have permission.
-		cmd := exec.Command(nft.path, "--check", "add", "table", string(nft.family), nft.table)
-		_, err = nft.exec.Run(cmd)
-		if err != nil {
+		tx := nft.NewTransaction()
+		tx.Add(&Table{})
+		if err := nft.Check(context.TODO(), tx); err != nil {
 			return nil, fmt.Errorf("could not run nftables command: %w", err)
 		}
 
