@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -517,6 +518,59 @@ func (fake *Fake) Dump() string {
 	}
 
 	return buf.String()
+}
+
+// ParseDump can parse a dump for a given nft instance.
+// It expects fake's table name and family in all rules.
+// The best way to verify that everything important was properly parsed is to
+// compare given data with nft.Dump() output.
+func (fake *Fake) ParseDump(data string) (err error) {
+	lines := strings.Split(data, "\n")
+	var i int
+	var line string
+	parsingDone := false
+	defer func() {
+		if err != nil && !parsingDone {
+			err = fmt.Errorf("%w (at line %v: %s", err, i+1, line)
+		}
+	}()
+	tx := fake.NewTransaction()
+	commonRegexp := regexp.MustCompile(fmt.Sprintf(`add %s %s %s (.*)`, noSpaceGroup, fake.family, fake.table))
+
+	for i, line = range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		match := commonRegexp.FindStringSubmatch(line)
+		if match == nil {
+			return fmt.Errorf("could not parse, or wrong table/family")
+		}
+		var obj Object
+		switch match[1] {
+		case "table":
+			obj = &Table{}
+		case "chain":
+			obj = &Chain{}
+		case "rule":
+			obj = &Rule{}
+		case "map":
+			obj = &Map{}
+		case "set":
+			obj = &Set{}
+		case "element":
+			obj = &Element{}
+		default:
+			return fmt.Errorf("unknown object %s", match[1])
+		}
+		err = obj.parse(match[2])
+		if err != nil {
+			return err
+		}
+		tx.Add(obj)
+	}
+	parsingDone = true
+	return fake.Run(context.Background(), tx)
 }
 
 func sortKeys[K ~string, V any](m map[K]V) []K {
