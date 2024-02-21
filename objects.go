@@ -549,19 +549,29 @@ func (element *Element) writeOperation(verb verb, ctx *nftContext, writer io.Wri
 	fmt.Fprintf(writer, " }\n")
 }
 
-// groups in []: [1]%s { [2]([^:"]*)(?: comment [3]%s)?(?: : [4](.*))? }
-var elementRegexp = regexp.MustCompile(fmt.Sprintf(
-	`%s { ([^:"]*)(?: comment %s)?(?: : (.*))? }`, noSpaceGroup, commentGroup))
+// groups in []: [1]%s { [2]([^:"]*)(?: comment [3]%s)? : [4](.*) }
+var mapElementRegexp = regexp.MustCompile(fmt.Sprintf(
+	`%s { ([^"]*)(?: comment %s)? : (.*) }`, noSpaceGroup, commentGroup))
+
+// groups in []: [1]%s { [2]([^:"]*)(?: comment [3]%s)? }
+var setElementRegexp = regexp.MustCompile(fmt.Sprintf(
+	`%s { ([^"]*)(?: comment %s)? }`, noSpaceGroup, commentGroup))
 
 func (element *Element) parse(line string) error {
-	match := elementRegexp.FindStringSubmatch(line)
+	// try to match map element first, since it has more groups, and if it matches, then we can be sure
+	// this is map element.
+	match := mapElementRegexp.FindStringSubmatch(line)
 	if match == nil {
-		return fmt.Errorf("failed parsing element add command")
+		match = setElementRegexp.FindStringSubmatch(line)
+		if match == nil {
+			return fmt.Errorf("failed parsing element add command")
+		}
 	}
 	element.Comment = getComment(match[3])
 	mapOrSetName := match[1]
 	element.Key = append(element.Key, strings.Split(match[2], " . ")...)
-	if match[4] != "" {
+	if len(match) == 5 {
+		// map regex matched
 		element.Map = mapOrSetName
 		element.Value = append(element.Value, strings.Split(match[4], " . ")...)
 	} else {
