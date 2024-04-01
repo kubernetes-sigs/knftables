@@ -1,5 +1,9 @@
 # ChangeLog
 
+## v0.0.16
+
+- Fixed a bug in `Fake.ParseDump()` when using IPv6. (`@npinaeva`)
+
 ## v0.0.15
 
 - knftables now requires the nft binary to be v1.0.1 or later. This is
