@@ -43,7 +43,8 @@ type Interface interface {
 	// list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
-	// ListRules returns a list of the rules in a chain, in order. Note that at the
+	// ListRules returns a list of the rules in a chain, in order. If no chain name is
+	// specified, then all rules within the table will be returned. Note that at the
 	// present time, the Rule objects will have their `Comment` and `Handle` fields
 	// filled in, but *not* the actual `Rule` field. So this can only be used to find
 	// the handles of rules if they have unique comments to recognize them by, or if
@@ -298,7 +299,13 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 // ListRules is part of Interface
 func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
+	// If no chain is given, return all rules from within the table.
+	var cmd *exec.Cmd
+	if chain == "" {
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	} else {
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
+	}
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -311,8 +318,12 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 	rules := make([]*Rule, 0, len(jsonRules))
 	for _, jsonRule := range jsonRules {
+		parentChain, ok := jsonVal[string](jsonRule, "chain")
+		if !ok {
+			return nil, fmt.Errorf("unexpected JSON output from nft (rule with no chain)")
+		}
 		rule := &Rule{
-			Chain: chain,
+			Chain: parentChain,
 		}
 
 		// handle is written as an integer in nft's output, but json.Unmarshal
