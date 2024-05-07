@@ -209,21 +209,25 @@ func TestRun(t *testing.T) {
 func TestListRules(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
+		chain      string
 		nftOutput  string
 		nftError   string
 		listOutput []*Rule
 	}{
 		{
 			name:     "no such chain",
+			chain:    "testchain",
 			nftError: "Error: No such file or directory\nlist chain ip testing testchain\n                      ^^^^^^^^^\n",
 		},
 		{
 			name:       "no rules",
+			chain:      "testchain",
 			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"chain": {"family": "ip", "table": "testing", "name": "testchain", "handle": 21}}]}`,
 			listOutput: []*Rule{},
 		},
 		{
 			name:      "normal output",
+			chain:     "testchain",
 			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"chain": {"family": "ip", "table": "testing", "name": "testchain", "handle": 165}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 169, "expr": [{"match": {"op": "==", "left": {"ct": {"key": "state"}}, "right": {"set": ["established", "related"]}}}, {"accept": null}]}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 170, "comment": "This rule does something", "expr": [{"match": {"op": "in", "left": {"ct": {"key": "status"}}, "right": "dnat"}}, {"accept": null}]}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 171, "expr": [{"match": {"op": "==", "left": {"meta": {"key": "iifname"}}, "right": "lo"}}, {"accept": null}]}}]}`,
 			listOutput: []*Rule{
 				{
@@ -241,6 +245,20 @@ func TestListRules(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:      "all rules in table",
+			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.2", "release_name": "Lester Gooch", "json_schema_version": 1}}, {"table": {"family": "ip", "name": "testing", "handle": 3}}, {"chain": {"family": "ip", "table": "testing", "name": "chain1", "handle": 1}}, {"rule": {"family": "ip", "table": "testing", "chain": "chain1", "handle": 3, "expr": [{"match": {"op": "==", "left": {"payload": {"protocol": "ip", "field": "daddr"}}, "right": "8.8.8.8"}}, {"counter": {"packets": 0, "bytes": 0}}]}}, {"chain": {"family": "ip", "table": "testing", "name": "chain2", "handle": 2}}, {"rule": {"family": "ip", "table": "testing", "chain": "chain2", "handle": 4, "expr": [{"match": {"op": "==", "left": {"payload": {"protocol": "ip", "field": "daddr"}}, "right": "1.2.3.4"}}, {"counter": {"packets": 0, "bytes": 0}}]}}]}`,
+			listOutput: []*Rule{
+				{
+					Chain:  "chain1",
+					Handle: PtrTo(3),
+				},
+				{
+					Chain:  "chain2",
+					Handle: PtrTo(4),
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
@@ -249,14 +267,24 @@ func TestListRules(t *testing.T) {
 			if tc.nftError != "" {
 				err = fmt.Errorf(tc.nftError)
 			}
-			fexec.expected = append(fexec.expected,
-				expectedCmd{
-					args:   []string{"/nft", "--json", "list", "chain", "ip", "testing", "testchain"},
-					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
-					err:    err,
-				},
-			)
-			result, err := nft.ListRules(context.Background(), "testchain")
+			if tc.chain == "" {
+				fexec.expected = append(fexec.expected,
+					expectedCmd{
+						args:   []string{"/nft", "--json", "list", "table", "ip", "testing"},
+						stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
+						err:    err,
+					},
+				)
+			} else {
+				fexec.expected = append(fexec.expected,
+					expectedCmd{
+						args:   []string{"/nft", "--json", "list", "chain", "ip", "testing", "testchain"},
+						stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
+						err:    err,
+					},
+				)
+			}
+			result, err := nft.ListRules(context.Background(), tc.chain)
 			if err != nil {
 				if tc.nftError == "" {
 					t.Errorf("unexpected error: %v", err)
