@@ -415,7 +415,7 @@ func (nft *realNFTables) ListElements(ctx context.Context, objectType, name stri
 	return elements, nil
 }
 
-// parseElementValue parses a JSON element key/value, handling concatenations, and
+// parseElementValue parses a JSON element key/value, handling concatenations, prefixes, and
 // converting numeric or "verdict" values to strings.
 func parseElementValue(json interface{}) ([]string, error) {
 	// json can be:
@@ -423,6 +423,14 @@ func parseElementValue(json interface{}) ([]string, error) {
 	//   - a single string, e.g. "192.168.1.3"
 	//
 	//   - a single number, e.g. 80
+	//
+	//   - a prefix, expressed as an object:
+	//     {
+	//       "prefix": {
+	//         "addr": "192.168.0.0",
+	//         "len": 16,
+	//       }
+	//     }
 	//
 	//   - a concatenation, expressed as an object containing an array of simple
 	//     values:
@@ -463,6 +471,17 @@ func parseElementValue(json interface{}) ([]string, error) {
 				}
 			}
 			return vals, nil
+		} else if prefix, _ := jsonVal[map[string]interface{}](val, "prefix"); prefix != nil {
+			// For prefix-type elements, return the element in CIDR representation.
+			addr, ok := jsonVal[string](prefix, "addr")
+			if !ok {
+				return nil, fmt.Errorf("could not parse 'addr' value as string: %q", prefix)
+			}
+			length, ok := jsonVal[float64](prefix, "len")
+			if !ok {
+				return nil, fmt.Errorf("could not parse 'len' value as number: %q", prefix)
+			}
+			return []string{fmt.Sprintf("%s/%d", addr, int(length))}, nil
 		} else if len(val) == 1 {
 			var verdict string
 			// We just checked that len(val) == 1, so this loop body will only

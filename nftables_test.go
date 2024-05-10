@@ -369,6 +369,29 @@ func TestListElements(t *testing.T) {
 			},
 		},
 		{
+			name:       "prefix type",
+			objectType: "set",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": ["ipv4_addr"], "handle": 13, "flags": ["interval"], "elem": [{"prefix": {"addr": "192.168.0.0", "len": 16}}]}}]}`,
+			listOutput: []*Element{
+				{
+					Set: "test",
+					Key: []string{"192.168.0.0/16"},
+				},
+			},
+		},
+		{
+			name:       "prefix type - bad len value",
+			objectType: "set",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": ["ipv4_addr"], "handle": 13, "flags": ["interval"], "elem": [{"prefix": {"addr": "192.168.0.0", "len": "16"}}]}}]}`,
+			nftError:   `could not parse 'len' value as number: map["addr":"192.168.0.0" "len":"16"]`,
+		},
+		{
+			name:       "prefix type - missing addr",
+			objectType: "set",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": ["ipv4_addr"], "handle": 13, "flags": ["interval"], "elem": [{"prefix": {"len": "16"}}]}}]}`,
+			nftError:   `could not parse 'addr' value as string: map["len":"16"]`,
+		},
+		{
 			name:       "simple map",
 			objectType: "map",
 			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"map": {"family": "ip", "name": "test", "table": "testing", "type": "ipv4_addr", "handle": 14, "map": "inet_service", "elem": [["10.0.0.1", 80], [{"elem": {"val": "10.0.0.2", "comment": "a comment"}}, 443]]}}]}`,
