@@ -307,6 +307,10 @@ func TestFakeCheck(t *testing.T) {
 	fake := NewFake(IPv4Family, "kube-proxy")
 
 	tx := fake.NewTransaction()
+	
+	if tx.NumOperations() != 0 {
+		t.Errorf("empty transaction should have 0 operations, got %d", tx.NumOperations())
+	}
 
 	tx.Add(&Table{})
 	tx.Add(&Chain{
@@ -333,6 +337,10 @@ func TestFakeCheck(t *testing.T) {
 	diff := cmp.Diff(expected, tx.String())
 	if diff != "" {
 		t.Errorf("unexpected transaction content:\n%s", diff)
+	}
+
+	if tx.NumOperations() != 4 {
+		t.Errorf("unexpected number of operations: expected 4, got %d", tx.NumOperations())
 	}
 
 	err := fake.Run(context.Background(), tx)
