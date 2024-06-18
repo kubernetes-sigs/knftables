@@ -76,6 +76,11 @@ func (tx *Transaction) String() string {
 	return buf.String()
 }
 
+// NumOperations returns the number of operations queued in the transaction.
+func (tx *Transaction) NumOperations() int {
+	return len(tx.operations)
+}
+
 func (tx *Transaction) operation(verb verb, obj Object) {
 	if tx.err != nil {
 		return
