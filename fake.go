@@ -120,13 +120,23 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 // ListRules is part of Interface
 func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
 	if fake.Table == nil {
-		return nil, notFoundError("no such chain %q", chain)
+		return nil, notFoundError("no such table %q", fake.table)
 	}
-	ch := fake.Table.Chains[chain]
-	if ch == nil {
-		return nil, notFoundError("no such chain %q", chain)
+
+	rules := []*Rule{}
+	if chain == "" {
+		// Include all rules across all chains.
+		for _, ch := range fake.Table.Chains {
+			rules = append(rules, ch.Rules...)
+		}
+	} else {
+		ch := fake.Table.Chains[chain]
+		if ch == nil {
+			return nil, notFoundError("no such chain %q", chain)
+		}
+		rules = append(rules, ch.Rules...)
 	}
-	return ch.Rules, nil
+	return rules, nil
 }
 
 // ListElements is part of Interface
