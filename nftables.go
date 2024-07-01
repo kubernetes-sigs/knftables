@@ -17,11 +17,13 @@ limitations under the License.
 package knftables
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 // Interface is an interface for running nftables commands against a given family and table.
@@ -71,6 +73,9 @@ type nftContext struct {
 type realNFTables struct {
 	nftContext
 
+	bufferMutex sync.Mutex
+	buffer      *bytes.Buffer
+
 	exec execer
 	path string
 }
@@ -85,8 +90,8 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 			family: family,
 			table:  table,
 		},
-
-		exec: execer,
+		buffer: &bytes.Buffer{},
+		exec:   execer,
 	}
 
 	nft.path, err = nft.exec.LookPath("nft")
@@ -136,34 +141,42 @@ func (nft *realNFTables) NewTransaction() *Transaction {
 
 // Run is part of Interface
 func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
+	nft.bufferMutex.Lock()
+	defer nft.bufferMutex.Unlock()
+
 	if tx.err != nil {
 		return tx.err
 	}
 
-	buf, err := tx.asCommandBuf()
+	nft.buffer.Reset()
+	err := tx.populateCommandBuf(nft.buffer)
 	if err != nil {
 		return err
 	}
 
 	cmd := exec.CommandContext(ctx, nft.path, "-f", "-")
-	cmd.Stdin = buf
+	cmd.Stdin = nft.buffer
 	_, err = nft.exec.Run(cmd)
 	return err
 }
 
 // Check is part of Interface
 func (nft *realNFTables) Check(ctx context.Context, tx *Transaction) error {
+	nft.bufferMutex.Lock()
+	defer nft.bufferMutex.Unlock()
+
 	if tx.err != nil {
 		return tx.err
 	}
 
-	buf, err := tx.asCommandBuf()
+	nft.buffer.Reset()
+	err := tx.populateCommandBuf(nft.buffer)
 	if err != nil {
 		return err
 	}
 
 	cmd := exec.CommandContext(ctx, nft.path, "--check", "-f", "-")
-	cmd.Stdin = buf
+	cmd.Stdin = nft.buffer
 	_, err = nft.exec.Run(cmd)
 	return err
 }
