@@ -113,14 +113,13 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	table := fake.Table
-	if table == nil {
+	if fake.Table == nil {
 		t.Fatalf("fake.Table is nil")
 	}
 
-	chain := table.Chains["chain"]
-	if chain == nil || len(table.Chains) != 2 {
-		t.Fatalf("unexpected contents of table.Chains: %+v", table.Chains)
+	chain := fake.Table.Chains["chain"]
+	if chain == nil || len(fake.Table.Chains) != 2 {
+		t.Fatalf("unexpected contents of table.Chains: %+v", fake.Table.Chains)
 	}
 
 	if len(chain.Rules) != 2 {
@@ -143,9 +142,9 @@ func TestFakeRun(t *testing.T) {
 	// Save this Rule object for later
 	ruleToDelete := chain.Rules[1]
 
-	m := table.Maps["map1"]
-	if m == nil || len(table.Maps) != 1 {
-		t.Fatalf("unexpected contents of table.Maps: %+v", table.Maps)
+	m := fake.Table.Maps["map1"]
+	if m == nil || len(fake.Table.Maps) != 1 {
+		t.Fatalf("unexpected contents of table.Maps: %+v", fake.Table.Maps)
 	}
 
 	elem := m.FindElement("192.168.0.2", "tcp", "443")
@@ -243,9 +242,9 @@ func TestFakeRun(t *testing.T) {
 	}
 
 	// Neither element should have been added
-	m = table.Maps["map1"]
-	if m == nil || len(table.Maps) != 1 {
-		t.Fatalf("unexpected contents of table.Maps: %+v", table.Maps)
+	m = fake.Table.Maps["map1"]
+	if m == nil || len(fake.Table.Maps) != 1 {
+		t.Fatalf("unexpected contents of table.Maps: %+v", fake.Table.Maps)
 	}
 
 	elem = m.FindElement("192.168.0.3", "tcp", "80")
@@ -258,6 +257,25 @@ func TestFakeRun(t *testing.T) {
 	}
 	if len(m.Elements) != 2 {
 		t.Errorf("unexpected contents of map1: %+v", m)
+	}
+
+	// Check delete element from map works
+	tx = fake.NewTransaction()
+	tx.Delete(&Element{
+		Map: "map1",
+		Key: []string{"192.168.0.1", "tcp", "80"},
+	})
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+	m = fake.Table.Maps["map1"]
+	if len(m.Elements) != 1 {
+		t.Errorf("unexpected contents of map1: %+v", m)
+	}
+	elem = m.FindElement("192.168.0.1", "tcp", "80")
+	if elem != nil {
+		t.Errorf("element should have been deleted: %+v", elem)
 	}
 
 	// Ensure that we can't add things that refer to non-existing things
