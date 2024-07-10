@@ -351,7 +351,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Element:
-			if len(obj.Value) == 0 {
+			if obj.Set != "" {
 				existingSet := updatedTable.Sets[obj.Set]
 				if existingSet == nil {
 					return nil, notFoundError("no such set %q", obj.Set)
