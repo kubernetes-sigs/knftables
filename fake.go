@@ -34,6 +34,10 @@ type Fake struct {
 	// Table contains the Interface's table. This will be `nil` until you `tx.Add()`
 	// the table.
 	Table *FakeTable
+
+	// LastTransaction is the last transaction passed to Run(). It will remain set until the
+	// next time Run() is called. (It is not affected by Check().)
+	LastTransaction *Transaction
 }
 
 // FakeTable wraps Table for the Fake implementation
@@ -165,6 +169,7 @@ func (fake *Fake) NewTransaction() *Transaction {
 
 // Run is part of Interface
 func (fake *Fake) Run(_ context.Context, tx *Transaction) error {
+	fake.LastTransaction = tx
 	updatedTable, err := fake.run(tx)
 	if err == nil {
 		fake.Table = updatedTable
