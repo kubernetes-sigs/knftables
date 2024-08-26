@@ -550,7 +550,7 @@ func (fake *Fake) ParseDump(data string) (err error) {
 		}
 	}()
 	tx := fake.NewTransaction()
-	commonRegexp := regexp.MustCompile(fmt.Sprintf(`add %s %s %s (.*)`, noSpaceGroup, fake.family, fake.table))
+	commonRegexp := regexp.MustCompile(fmt.Sprintf(`add ([^ ]*) %s %s( (.*))?`, fake.family, fake.table))
 
 	for i, line = range lines {
 		line = strings.TrimSpace(line)
@@ -578,7 +578,7 @@ func (fake *Fake) ParseDump(data string) (err error) {
 		default:
 			return fmt.Errorf("unknown object %s", match[1])
 		}
-		err = obj.parse(match[2])
+		err = obj.parse(match[3])
 		if err != nil {
 			return err
 		}
