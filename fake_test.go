@@ -593,7 +593,7 @@ func TestFakeParseDump(t *testing.T) {
 		{
 			ipFamily: IPv4Family,
 			dump: `
-			add table ip kube-proxy { comment "" ; }
+			add table ip kube-proxy
 			add chain ip kube-proxy anotherchain
 			add chain ip kube-proxy chain { comment "foo" ; }
 			add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service ; }
