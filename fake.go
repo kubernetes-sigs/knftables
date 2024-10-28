@@ -52,6 +52,9 @@ type FakeTable struct {
 	Table
 
 	// Chains contains the table's chains, keyed by name
+	Flowtables map[string]*FakeFlowtable
+
+	// Chains contains the table's chains, keyed by name
 	Chains map[string]*FakeChain
 
 	// Sets contains the table's sets, keyed by name
@@ -59,6 +62,11 @@ type FakeTable struct {
 
 	// Maps contains the table's maps, keyed by name
 	Maps map[string]*FakeMap
+}
+
+// FakeFlowtable wraps Flowtable for the Fake implementation
+type FakeFlowtable struct {
+	Flowtable
 }
 
 // FakeChain wraps Chain for the Fake implementation
@@ -110,6 +118,10 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 	var result []string
 
 	switch objectType {
+	case "flowtable", "flowtables":
+		for name := range fake.Table.Flowtables {
+			result = append(result, name)
+		}
 	case "chain", "chains":
 		for name := range fake.Table.Chains {
 			result = append(result, name)
@@ -236,13 +248,37 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				table := *obj
 				table.Handle = PtrTo(fake.nextHandle)
 				updatedTable = &FakeTable{
-					Table:  table,
-					Chains: make(map[string]*FakeChain),
-					Sets:   make(map[string]*FakeSet),
-					Maps:   make(map[string]*FakeMap),
+					Table:      table,
+					Flowtables: make(map[string]*FakeFlowtable),
+					Chains:     make(map[string]*FakeChain),
+					Sets:       make(map[string]*FakeSet),
+					Maps:       make(map[string]*FakeMap),
 				}
 			case deleteVerb:
 				updatedTable = nil
+			default:
+				return nil, fmt.Errorf("unhandled operation %q", op.verb)
+			}
+
+		case *Flowtable:
+			existingFlowtable := updatedTable.Flowtables[obj.Name]
+			err := checkExists(op.verb, "flowtable", obj.Name, existingFlowtable != nil)
+			if err != nil {
+				return nil, err
+			}
+			switch op.verb {
+			case addVerb, createVerb:
+				if existingFlowtable != nil {
+					continue
+				}
+				flowtable := *obj
+				flowtable.Handle = PtrTo(fake.nextHandle)
+				updatedTable.Flowtables[obj.Name] = &FakeFlowtable{
+					Flowtable: flowtable,
+				}
+			case deleteVerb:
+				// FIXME delete-by-handle
+				delete(updatedTable.Flowtables, obj.Name)
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
@@ -507,6 +543,7 @@ func (fake *Fake) Dump() string {
 	buf := &strings.Builder{}
 
 	table := fake.Table
+	flowtables := sortKeys(table.Flowtables)
 	chains := sortKeys(table.Chains)
 	sets := sortKeys(table.Sets)
 	maps := sortKeys(table.Maps)
@@ -514,6 +551,10 @@ func (fake *Fake) Dump() string {
 	// Write out all of the object adds first.
 
 	table.writeOperation(addVerb, &fake.nftContext, buf)
+	for _, fname := range flowtables {
+		ch := table.Flowtables[fname]
+		ch.writeOperation(addVerb, &fake.nftContext, buf)
+	}
 	for _, cname := range chains {
 		ch := table.Chains[cname]
 		ch.writeOperation(addVerb, &fake.nftContext, buf)
@@ -585,6 +626,8 @@ func (fake *Fake) ParseDump(data string) (err error) {
 		switch match[1] {
 		case "table":
 			obj = &Table{}
+		case "flowtable":
+			obj = &Flowtable{}
 		case "chain":
 			obj = &Chain{}
 		case "rule":
@@ -643,10 +686,16 @@ func (table *FakeTable) copy() *FakeTable {
 	}
 
 	tcopy := &FakeTable{
-		Table:  table.Table,
-		Chains: make(map[string]*FakeChain),
-		Sets:   make(map[string]*FakeSet),
-		Maps:   make(map[string]*FakeMap),
+		Table:      table.Table,
+		Flowtables: make(map[string]*FakeFlowtable),
+		Chains:     make(map[string]*FakeChain),
+		Sets:       make(map[string]*FakeSet),
+		Maps:       make(map[string]*FakeMap),
+	}
+	for name, flowtable := range table.Flowtables {
+		tcopy.Flowtables[name] = &FakeFlowtable{
+			Flowtable: flowtable.Flowtable,
+		}
 	}
 	for name, chain := range table.Chains {
 		tcopy.Chains[name] = &FakeChain{

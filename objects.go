@@ -579,3 +579,80 @@ func (element *Element) parse(line string) error {
 	}
 	return nil
 }
+
+// Object implementation for Flowtable
+func (flowtable *Flowtable) validate(verb verb) error {
+	switch verb {
+	case addVerb, createVerb:
+		if flowtable.Name == "" {
+			return fmt.Errorf("no name specified for flowtable")
+		}
+		if flowtable.Handle != nil {
+			return fmt.Errorf("cannot specify Handle in %s operation", verb)
+		}
+	case deleteVerb:
+		if flowtable.Name == "" && flowtable.Handle == nil {
+			return fmt.Errorf("must specify either name or handle")
+		}
+	default:
+		return fmt.Errorf("%s is not implemented for flowtables", verb)
+	}
+
+	return nil
+}
+
+func (flowtable *Flowtable) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
+	// Special case for delete-by-handle
+	if verb == deleteVerb && flowtable.Handle != nil {
+		fmt.Fprintf(writer, "delete flowtable %s %s handle %d", ctx.family, ctx.table, *flowtable.Handle)
+		return
+	}
+
+	fmt.Fprintf(writer, "%s flowtable %s %s %s", verb, ctx.family, ctx.table, flowtable.Name)
+	if verb == addVerb || verb == createVerb {
+		if flowtable.Priority != nil || (len(flowtable.Devices) > 0) {
+			fmt.Fprintf(writer, " {")
+
+			if flowtable.Priority != nil {
+				// Parse the priority to a number if we can, because older
+				// versions of nft don't accept certain named priorities
+				// in all contexts (eg, "dstnat" priority in the "output"
+				// hook).
+				if priority, err := ParsePriority(ctx.family, string(*flowtable.Priority)); err == nil {
+					fmt.Fprintf(writer, " hook ingress priority %d ;", priority)
+				} else {
+					fmt.Fprintf(writer, " hook ingress priority %s ;", *flowtable.Priority)
+				}
+			}
+
+			if len(flowtable.Devices) > 0 {
+				fmt.Fprintf(writer, " devices = { %s } ;", strings.Join(flowtable.Devices, ","))
+			}
+
+			fmt.Fprintf(writer, " }")
+		}
+	}
+
+	fmt.Fprintf(writer, "\n")
+}
+
+// nft add flowtable inet example_table example_flowtable { hook ingress priority filter \; devices = { eth0 }\;  }
+// groups in []: [1]%s(?: {(?: type [2]%s hook [3]%s(?: device "[4]%s")(?: priority [5]%s ;))(?: comment [6]%s ;) })
+var flowtableRegexp = regexp.MustCompile(fmt.Sprintf(
+	`%s(?: {(?: hook ingress priority %s ;)(?: devices = { %s } ;) })?`,
+	noSpaceGroup, noSpaceGroup, noSpaceGroup))
+
+func (flowtable *Flowtable) parse(line string) error {
+	match := flowtableRegexp.FindStringSubmatch(line)
+	if match == nil {
+		return fmt.Errorf("failed parsing flowtableRegexp add command")
+	}
+	flowtable.Name = match[1]
+	if match[2] != "" {
+		flowtable.Priority = (*FlowtableHookPriority)(&match[2])
+	}
+	if match[3] != "" {
+		flowtable.Devices = strings.Split(strings.TrimSpace(match[3]), ",")
+	}
+	return nil
+}

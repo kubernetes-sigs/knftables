@@ -95,6 +95,101 @@ func TestObjects(t *testing.T) {
 			err:    "cannot specify Handle",
 		},
 
+		// Flowtables
+		{
+			name: "add flowtable",
+			verb: addVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			},
+			out: `add flowtable ip mytable myflowtable`,
+		},
+		{
+			name: "create flowtable",
+			verb: createVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			},
+			out: `create flowtable ip mytable myflowtable`,
+		},
+		{
+			name: "create flowtable with priority math",
+			verb: createVerb,
+			object: &Flowtable{
+				Name:     "myflowtable",
+				Priority: PtrTo(FilterHookPriority + "+5"),
+			},
+			out: `create flowtable ip mytable myflowtable { hook ingress priority 5 ; }`,
+		},
+		{
+			name: "create flowtable with devices",
+			verb: createVerb,
+			object: &Flowtable{
+				Name:    "myflowtable",
+				Devices: []string{"eth0", "eth1"},
+			},
+			out: `create flowtable ip mytable myflowtable { devices = { eth0,eth1 } ; }`,
+		},
+		{
+			name: "create flowtable with devices and default priority",
+			verb: createVerb,
+			object: &Flowtable{
+				Name:     "myflowtable",
+				Priority: PtrTo(FilterHookPriority),
+				Devices:  []string{"eth0", "eth1"},
+			},
+			out: `create flowtable ip mytable myflowtable { hook ingress priority 0 ; devices = { eth0,eth1 } ; }`,
+		},
+		{
+			name: "flush flowtable",
+			verb: flushVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			},
+			err: "not implemented",
+		},
+		{
+			name: "delete flowtable",
+			verb: deleteVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			},
+			out: `delete flowtable ip mytable myflowtable`,
+		},
+		{
+			name: "delete flowtable by handle",
+			verb: deleteVerb,
+			object: &Flowtable{
+				Name:   "myflowtable",
+				Handle: PtrTo(5),
+			},
+			out: `delete flowtable ip mytable handle 5`,
+		},
+		{
+			name: "invalid insert flowtable",
+			verb: insertVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			}, err: "not implemented",
+		},
+		{
+			name: "invalid replace flowtable",
+			verb: replaceVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			},
+			err: "not implemented",
+		},
+		{
+			name: "invalid add flowtable with Handle",
+			verb: addVerb,
+			object: &Flowtable{
+				Name:   "myflowtable",
+				Handle: PtrTo(5),
+			},
+			err: "cannot specify Handle",
+		},
+
 		// Chains
 		{
 			name:   "add chain",

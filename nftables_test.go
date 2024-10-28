@@ -32,6 +32,8 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 	ip := "ip"
 	if family == IPv6Family {
 		ip = "ip6"
+	} else if family == InetFamily {
+		ip = "inet"
 	}
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
@@ -173,6 +175,52 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestListFlowtables(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		objType    string
+		nftOutput  string
+		listOutput []string
+	}{
+		{
+			name:       "empty list",
+			objType:    "flowtables",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}]}`,
+			listOutput: nil,
+		},
+		{
+			name:       "singular objType",
+			objType:    "flowtables",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.6", "release_name": "Lester Gooch #5", "json_schema_version": 1}}, {"flowtable": {"family": "inet", "name": "test3", "table": "kindnet-ipmasq", "handle": 3273, "hook": "ingress", "prio": 5, "dev": "eth0"}}, {"flowtable": {"family": "inet", "name": "test", "table": "kindnet-dnscache", "handle": 245503, "hook": "ingress", "prio": 0}}, {"flowtable": {"family": "inet", "name": "test2", "table": "kindnet-dnscache", "handle": 2859641, "hook": "ingress", "prio": 0, "dev": "eth0"}}]}`,
+			listOutput: nil,
+		},
+		{
+			name:       "plural objType",
+			objType:    "flowtables",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.6", "release_name": "Lester Gooch #5", "json_schema_version": 1}}, {"flowtable": {"family": "inet", "name": "test3", "table": "kindnet-ipmasq", "handle": 3273, "hook": "ingress", "prio": 5, "dev": "eth0"}}, {"flowtable": {"family": "inet", "name": "test", "table": "kindnet-dnscache", "handle": 245503, "hook": "ingress", "prio": 0}}, {"flowtable": {"family": "inet", "name": "test2", "table": "kindnet-dnscache", "handle": 2859641, "hook": "ingress", "prio": 0, "dev": "eth0"}}]}`,
+			listOutput: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			nft, fexec, _ := newTestInterface(t, InetFamily, "testing")
+
+			fexec.expected = append(fexec.expected,
+				expectedCmd{
+					args:   []string{"/nft", "--json", "list", "flowtables", "inet"},
+					stdout: tc.nftOutput,
+				},
+			)
+			result, err := nft.List(context.Background(), tc.objType)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(result, tc.listOutput) {
+				t.Errorf("unexpected result: wanted %v got %v", tc.listOutput, result)
+			}
+		})
+	}
+}
+
 func TestRun(t *testing.T) {
 	nft, fexec, _ := newTestInterface(t, IPv4Family, "kube-proxy")
 
@@ -187,11 +235,16 @@ func TestRun(t *testing.T) {
 		Chain: "chain",
 		Rule:  "ip daddr 10.0.0.0/8 drop",
 	})
-
+	tx.Add(&Flowtable{
+		Name:     "flowtable",
+		Priority: PtrTo(FilterHookPriority),
+		Devices:  []string{"eth0", "eth1"},
+	})
 	expected := strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add flowtable ip kube-proxy flowtable { hook ingress priority 0 ; devices = { eth0,eth1 } ; }
 		`), "\n")
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
