@@ -88,6 +88,10 @@ func TestFakeRun(t *testing.T) {
 		Key:   []string{"192.168.0.1", "tcp", "80"},
 		Value: []string{"drop"},
 	})
+	tx.Add(&Flowtable{
+		Name:    "myflowtable",
+		Devices: []string{"eth0", "eth1"},
+	})
 
 	// The transaction should contain exactly those commands, in order
 	expected := strings.TrimPrefix(dedent.Dedent(`
@@ -102,6 +106,7 @@ func TestFakeRun(t *testing.T) {
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : goto chain }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
+		add flowtable ip kube-proxy myflowtable { devices = { eth0, eth1 } ; }
 		`), "\n")
 	diff := cmp.Diff(expected, tx.String())
 	if diff != "" {
@@ -168,6 +173,7 @@ func TestFakeRun(t *testing.T) {
 	// be seen.
 	expected = strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
+		add flowtable ip kube-proxy myflowtable { devices = { eth0, eth1 } ; }
 		add chain ip kube-proxy anotherchain
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
@@ -208,6 +214,7 @@ func TestFakeRun(t *testing.T) {
 	}
 	expected = strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
+		add flowtable ip kube-proxy myflowtable { devices = { eth0, eth1 } ; }
 		add chain ip kube-proxy anotherchain
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
@@ -594,6 +601,7 @@ func TestFakeParseDump(t *testing.T) {
 			ipFamily: IPv4Family,
 			dump: `
 			add table ip kube-proxy
+			add flowtable ip kube-proxy myflowtable { hook ingress priority filter ; devices = { eth0, eth1 } ; }
 			add chain ip kube-proxy anotherchain
 			add chain ip kube-proxy chain { comment "foo" ; }
 			add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service ; }
@@ -610,7 +618,6 @@ func TestFakeParseDump(t *testing.T) {
 			ipFamily: IPv4Family,
 			dump: `
 			add table ip kube-proxy { comment "rules for kube-proxy" ; }
-
 			add chain ip kube-proxy mark-for-masquerade
 			add chain ip kube-proxy masquerading
 			add chain ip kube-proxy services

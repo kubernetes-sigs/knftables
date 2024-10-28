@@ -29,10 +29,6 @@ import (
 
 func newTestInterface(t *testing.T, family Family, tableName string) (Interface, *fakeExec, error) {
 	fexec := newFakeExec(t)
-	ip := "ip"
-	if family == IPv6Family {
-		ip = "ip6"
-	}
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
 			args:   []string{"/nft", "--version"},
@@ -40,7 +36,7 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 		},
 		expectedCmd{
 			args:  []string{"/nft", "--check", "-f", "-"},
-			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", ip, tableName),
+			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", family, tableName),
 		},
 	)
 	nft, err := newInternal(family, tableName, fexec)
@@ -187,11 +183,16 @@ func TestRun(t *testing.T) {
 		Chain: "chain",
 		Rule:  "ip daddr 10.0.0.0/8 drop",
 	})
-
+	tx.Add(&Flowtable{
+		Name:     "flowtable",
+		Priority: PtrTo(FilterIngressPriority),
+		Devices:  []string{"eth0", "eth1"},
+	})
 	expected := strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add flowtable ip kube-proxy flowtable { hook ingress priority filter ; devices = { eth0, eth1 } ; }
 		`), "\n")
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
