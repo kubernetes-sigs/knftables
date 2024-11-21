@@ -617,6 +617,13 @@ func TestFakeParseDump(t *testing.T) {
 		{
 			ipFamily: IPv4Family,
 			dump: `
+			add table ip kube-proxy { flags dormant ; }
+			add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -100 ; policy drop ; }
+			`,
+		},
+		{
+			ipFamily: IPv4Family,
+			dump: `
 			add table ip kube-proxy { comment "rules for kube-proxy" ; }
 			add chain ip kube-proxy mark-for-masquerade
 			add chain ip kube-proxy masquerading

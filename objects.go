@@ -76,15 +76,38 @@ func (table *Table) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 	// All other cases refer to the table by name
 	fmt.Fprintf(writer, "%s table %s %s", verb, ctx.family, ctx.table)
 	if verb == addVerb || verb == createVerb {
-		if table.Comment != nil && !ctx.noObjectComments {
-			fmt.Fprintf(writer, " { comment %q ; }", *table.Comment)
+		hasComment := table.Comment != nil && !ctx.noObjectComments
+		if hasComment || len(table.Flags) != 0 {
+			fmt.Fprintf(writer, " {")
+			if hasComment {
+				fmt.Fprintf(writer, " comment %q ;", *table.Comment)
+			}
+			if len(table.Flags) != 0 {
+				fmt.Fprintf(writer, " flags ")
+				for i := range table.Flags {
+					if i > 0 {
+						fmt.Fprintf(writer, ",")
+					}
+					fmt.Fprintf(writer, "%s", table.Flags[i])
+				}
+				fmt.Fprintf(writer, " ;")
+			}
+			fmt.Fprintf(writer, " }")
 		}
 	}
 	fmt.Fprintf(writer, "\n")
 }
 
 var tableRegexp = regexp.MustCompile(fmt.Sprintf(
-	`(?:{ comment %s ; })?`, commentGroup))
+	`(?:{ (?:comment %s ; )?(?:flags %s ; )?})?`, commentGroup, noSpaceGroup))
+
+func parseTableFlags(s string) []TableFlag {
+	var res []TableFlag
+	for _, flag := range strings.Split(s, ",") {
+		res = append(res, TableFlag(flag))
+	}
+	return res
+}
 
 func (table *Table) parse(line string) error {
 	match := tableRegexp.FindStringSubmatch(line)
@@ -92,6 +115,9 @@ func (table *Table) parse(line string) error {
 		return fmt.Errorf("failed parsing table add command")
 	}
 	table.Comment = getComment(match[1])
+	if match[2] != "" {
+		table.Flags = parseTableFlags(match[2])
+	}
 	return nil
 }
 
@@ -100,6 +126,9 @@ func (chain *Chain) validate(verb verb) error {
 	if chain.Hook == nil {
 		if chain.Type != nil || chain.Priority != nil {
 			return fmt.Errorf("regular chain %q must not specify Type or Priority", chain.Name)
+		}
+		if chain.Policy != nil {
+			return fmt.Errorf("regular chain %q must not specify Policy", chain.Name)
 		}
 		if chain.Device != nil {
 			return fmt.Errorf("regular chain %q must not specify Device", chain.Name)
@@ -156,6 +185,9 @@ func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 				} else {
 					fmt.Fprintf(writer, " priority %s ;", *chain.Priority)
 				}
+				if chain.Policy != nil {
+					fmt.Fprintf(writer, " policy %s ;", *chain.Policy)
+				}
 			}
 			if chain.Comment != nil && !ctx.noObjectComments {
 				fmt.Fprintf(writer, " comment %q ;", *chain.Comment)
@@ -168,10 +200,10 @@ func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 	fmt.Fprintf(writer, "\n")
 }
 
-// groups in []: [1]%s(?: {(?: type [2]%s hook [3]%s(?: device "[4]%s")(?: priority [5]%s ;))(?: comment [6]%s ;) })
+// groups in []: [1]%s(?: {(?: type [2]%s hook [3]%s(?: device "[4]%s")(?: priority [5]%s ;)(?: policy [6]%s ;)?)(?: comment [7]%s ;) })
 var chainRegexp = regexp.MustCompile(fmt.Sprintf(
-	`%s(?: {(?: type %s hook %s(?: device "%s")?(?: priority %s ;))?(?: comment %s ;)? })?`,
-	noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, commentGroup))
+	`%s(?: {(?: type %s hook %s(?: device "%s")?(?: priority %s ;)(?: policy %s ;)?)?(?: comment %s ;)? })?`,
+	noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, commentGroup))
 
 func (chain *Chain) parse(line string) error {
 	match := chainRegexp.FindStringSubmatch(line)
@@ -179,7 +211,7 @@ func (chain *Chain) parse(line string) error {
 		return fmt.Errorf("failed parsing chain add command")
 	}
 	chain.Name = match[1]
-	chain.Comment = getComment(match[6])
+	chain.Comment = getComment(match[7])
 	if match[2] != "" {
 		chain.Type = (*BaseChainType)(&match[2])
 	}
@@ -191,6 +223,9 @@ func (chain *Chain) parse(line string) error {
 	}
 	if match[5] != "" {
 		chain.Priority = (*BaseChainPriority)(&match[5])
+	}
+	if match[6] != "" {
+		chain.Policy = (*BaseChainPolicy)(&match[6])
 	}
 	return nil
 }

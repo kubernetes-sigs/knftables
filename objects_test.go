@@ -53,6 +53,21 @@ func TestObjects(t *testing.T) {
 			out:    `add table ip mytable { comment "foo" ; }`,
 		},
 		{
+			name:   "add table with flags",
+			verb:   addVerb,
+			object: &Table{Flags: []TableFlag{DormantFlag}},
+			out:    `add table ip mytable { flags dormant ; }`,
+		},
+		{
+			name: "add table with comment and flags",
+			verb: addVerb,
+			object: &Table{
+				Comment: PtrTo("foo"),
+				Flags:   []TableFlag{DormantFlag},
+			},
+			out: `add table ip mytable { comment "foo" ; flags dormant ; }`,
+		},
+		{
 			name:   "create table",
 			verb:   createVerb,
 			object: &Table{},
@@ -228,6 +243,12 @@ func TestObjects(t *testing.T) {
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; comment "foo" ; }`,
 		},
 		{
+			name:   "add base chain with policy",
+			verb:   addVerb,
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority), Policy: PtrTo(DropPolicy)},
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; policy drop ; }`,
+		},
+		{
 			name:   "add base chain with device",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(IngressHook), Device: PtrTo("eth0"), Priority: PtrTo(SNATPriority)},
@@ -324,7 +345,13 @@ func TestObjects(t *testing.T) {
 			err:    "must not specify Type or Priority",
 		},
 		{
-			name:   "invalid add non-base chain with device",
+			name:   "invalid add non-base chain with Policy",
+			verb:   addVerb,
+			object: &Chain{Name: "mychain", Policy: PtrTo(AcceptPolicy)},
+			err:    "must not specify Policy",
+		},
+		{
+			name:   "invalid add non-base chain with Device",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Device: PtrTo("eth0")},
 			err:    "must not specify Device",

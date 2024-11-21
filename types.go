@@ -71,12 +71,24 @@ const (
 	NetDevFamily Family = "netdev"
 )
 
+// TableFlag represents a table flag
+type TableFlag string
+
+const (
+	// DormantFlag indicates that a table is not currently evaluated. (Its base chains
+	// are unregistered.)
+	DormantFlag TableFlag = "dormant"
+)
+
 // Table represents an nftables table.
 type Table struct {
 	// Comment is an optional comment for the table. (Requires kernel >= 5.10 and
 	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
 	// nft >= 1.0.8 to include comments in List() results.)
 	Comment *string
+
+	// Flags are the table flags
+	Flags []TableFlag
 
 	// Handle is an identifier that can be used to uniquely identify an object when
 	// deleting it. When adding a new object, this must be nil.
@@ -185,6 +197,19 @@ const (
 	SNATPriority BaseChainPriority = "srcnat"
 )
 
+// BaseChainPolicy sets what happens to packets not explicitly accepted or refused by a
+// base chain.
+type BaseChainPolicy string
+
+const (
+	// AcceptPolicy, which is the default, accepts any unmatched packets (though,
+	// as with any other nftables chain, a later chain can drop or reject it).
+	AcceptPolicy BaseChainPolicy = "accept"
+
+	// DropPolicy drops any unmatched packets.
+	DropPolicy BaseChainPolicy = "drop"
+)
+
 // Chain represents an nftables chain; either a "base chain" (if Type, Hook, and Priority
 // are specified), or a "regular chain" (if they are not).
 type Chain struct {
@@ -200,6 +225,10 @@ type Chain struct {
 	// Priority is the chain priority; this must be set for a base chain and unset for
 	// a regular chain. You can call ParsePriority() to convert this to a number.
 	Priority *BaseChainPriority
+
+	// Policy is the policy for packets not explicitly accepted or refused by a base
+	// chain.
+	Policy *BaseChainPolicy
 
 	// Device is the network interface that the chain is attached to; this must be set
 	// for a base chain connected to the "ingress" or "egress" hooks, and unset for
