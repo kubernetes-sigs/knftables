@@ -204,14 +204,11 @@ func (nft *realNFTables) Run(ctx context.Context, tx *Transaction) error {
 	}
 
 	nft.buffer.Reset()
-	err := tx.populateCommandBuf(nft.buffer)
-	if err != nil {
-		return err
-	}
+	tx.populateCommandBuf(nft.buffer)
 
 	cmd := exec.CommandContext(ctx, nft.path, "-f", "-")
 	cmd.Stdin = nft.buffer
-	_, err = nft.exec.Run(cmd)
+	_, err := nft.exec.Run(cmd)
 	return err
 }
 
@@ -225,14 +222,11 @@ func (nft *realNFTables) Check(ctx context.Context, tx *Transaction) error {
 	}
 
 	nft.buffer.Reset()
-	err := tx.populateCommandBuf(nft.buffer)
-	if err != nil {
-		return err
-	}
+	tx.populateCommandBuf(nft.buffer)
 
 	cmd := exec.CommandContext(ctx, nft.path, "--check", "-f", "-")
 	cmd.Stdin = nft.buffer
-	_, err = nft.exec.Run(cmd)
+	_, err := nft.exec.Run(cmd)
 	return err
 }
 

@@ -49,25 +49,17 @@ const (
 )
 
 // populateCommandBuf populates the transaction as series of nft commands to the given bytes.Buffer.
-func (tx *Transaction) populateCommandBuf(buf *bytes.Buffer) error {
-	if tx.err != nil {
-		return tx.err
-	}
-
+func (tx *Transaction) populateCommandBuf(buf *bytes.Buffer) {
 	for _, op := range tx.operations {
 		op.obj.writeOperation(op.verb, tx.nftContext, buf)
 	}
-	return nil
 }
 
 // String returns the transaction as a string containing the nft commands; if there is
 // a pending error, it will be output as a comment at the end of the transaction.
 func (tx *Transaction) String() string {
 	buf := &bytes.Buffer{}
-	for _, op := range tx.operations {
-		op.obj.writeOperation(op.verb, tx.nftContext, buf)
-	}
-
+	tx.populateCommandBuf(buf)
 	if tx.err != nil {
 		fmt.Fprintf(buf, "# ERROR: %v", tx.err)
 	}
