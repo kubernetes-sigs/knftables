@@ -72,6 +72,16 @@ const (
 	// or kernel does not support them. (The only real reason to specify this is if
 	// you want to avoid doing any "nft check" calls at construction time.)
 	NoObjectCommentEmulation Option = "NoObjectCommentEmulation"
+
+	// RequireDestroy tells knftables.New to fail if the `nft destroy` command is not
+	// available.
+	RequireDestroy Option = "RequireDestroy"
+
+	// EmulateDestroy tells the Interface to emulate the `nft destroy` command if it
+	// is not available. If you pass this option, then that will restrict the ways
+	// that you can use the `tx.Destroy()` method to be compatible with destroy
+	// emulation; see the docs for that method for more details.
+	EmulateDestroy Option = "EmulateDestroy"
 )
 
 type nftContext struct {
@@ -81,6 +91,14 @@ type nftContext struct {
 	// noObjectComments is true if comments on Table/Chain/Set/Map are not supported.
 	// (Comments on Rule and Element are always supported.)
 	noObjectComments bool
+
+	// emulateDestroy is true if tx.Destroy() should restrict itself to destroy
+	// actions that are compatible with an emulated version of "nft destroy"
+	emulateDestroy bool
+
+	// hasDestroy is true emulateDestroy is true but the nft binary actually supports
+	// "destroy" so we don't need to bother emulating it.
+	hasDestroy bool
 }
 
 // realNFTables is an implementation of Interface
@@ -168,6 +186,23 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 		}
 	}
 
+	requireDestroy := optionSet(options, RequireDestroy)
+	emulateDestroy := optionSet(options, EmulateDestroy)
+	if requireDestroy || emulateDestroy {
+		// Check if "nft destroy" is available.
+		tx = nft.NewTransaction()
+		tx.Destroy(&Table{})
+		if err := nft.Check(context.TODO(), tx); err != nil {
+			if requireDestroy {
+				return nil, fmt.Errorf("`nft destroy` is not available: %w", err)
+			}
+		} else {
+			nft.hasDestroy = true
+		}
+		// Can't set this until after doing the test above
+		nft.emulateDestroy = emulateDestroy
+	}
+
 	return nft, nil
 }
 
@@ -185,6 +220,13 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 //   - NoObjectCommentEmulation: disables the default knftables.Interface behavior of
 //     ignoring comments on Table, Chain, Set, and Map objects if the underlying CLI or
 //     kernel does not support them.
+//
+//   - RequireDestroy: require the system to support `nft destroy`; the New() call will
+//     fail with an error on older systems.
+//
+//   - EmulateDestroy: adjust the API of `tx.Destroy()` to make it possible to emulate via
+//     `nft add` and `nft delete` on systems that do not have `nft destroy`; see the docs
+//     for `tx.Destroy()` for more details.
 func New(family Family, table string, options ...Option) (Interface, error) {
 	return newInternal(family, table, realExec{}, options...)
 }

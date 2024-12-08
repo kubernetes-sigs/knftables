@@ -509,6 +509,10 @@ func TestFeatures(t *testing.T) {
 					args:  []string{"/nft", "--check", "-f", "-"},
 					stdin: "add table ip testing { comment \"test\" ; }\n",
 				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "destroy table ip testing\n",
+				},
 			},
 			result: &nftContext{
 				family: IPv4Family,
@@ -532,6 +536,10 @@ func TestFeatures(t *testing.T) {
 				{
 					args:  []string{"/nft", "--check", "-f", "-"},
 					stdin: "add table ip testing\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "destroy table ip testing\n",
 				},
 			},
 			result: &nftContext{
@@ -558,6 +566,109 @@ func TestFeatures(t *testing.T) {
 				},
 			},
 			result: nil,
+		},
+		{
+			name:    "EmulateDestroy when destroy is unavailable",
+			options: []Option{EmulateDestroy},
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--version",
+					},
+					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing { comment \"test\" ; }\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "destroy table ip testing\n",
+					err:   fmt.Errorf("Error: syntax error, blah blah"),
+				},
+			},
+			result: &nftContext{
+				family: IPv4Family,
+				table:  "testing",
+
+				emulateDestroy: true,
+				hasDestroy:     false,
+			},
+		},
+		{
+			name:    "EmulateDestroy when destroy is available",
+			options: []Option{EmulateDestroy},
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--version",
+					},
+					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing { comment \"test\" ; }\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "destroy table ip testing\n",
+				},
+			},
+			result: &nftContext{
+				family: IPv4Family,
+				table:  "testing",
+
+				emulateDestroy: true,
+				hasDestroy:     true,
+			},
+		},
+		{
+			name:    "RequireDestroy when destroy is not available",
+			options: []Option{RequireDestroy},
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--version",
+					},
+					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing { comment \"test\" ; }\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "destroy table ip testing\n",
+					err:   fmt.Errorf("Error: syntax error, blah blah"),
+				},
+			},
+			result: nil,
+		},
+		{
+			name:    "RequireDestroy when destroy is available",
+			options: []Option{RequireDestroy},
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--version",
+					},
+					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing { comment \"test\" ; }\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "destroy table ip testing\n",
+				},
+			},
+			result: &nftContext{
+				family: IPv4Family,
+				table:  "testing",
+
+				hasDestroy: true,
+			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -82,7 +82,7 @@ func (table *Table) validate(verb verb, ctx *nftContext) error {
 		if table.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 		// Handle can be nil or non-nil
 	default:
 		return fmt.Errorf("%s is not implemented for tables", verb)
@@ -95,8 +95,8 @@ func (table *Table) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 	family, tableName, _ := getTable(ctx, table.Family, table.Name)
 
 	// Special case for delete-by-handle
-	if verb == deleteVerb && table.Handle != nil {
-		fmt.Fprintf(writer, "delete table %s handle %d", family, *table.Handle)
+	if (verb == deleteVerb || verb == destroyVerb) && table.Handle != nil {
+		fmt.Fprintf(writer, "%s table %s handle %d", verb, family, *table.Handle)
 		return
 	}
 
@@ -179,7 +179,7 @@ func (chain *Chain) validate(verb verb, ctx *nftContext) error {
 		if chain.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 		if chain.Name == "" && chain.Handle == nil {
 			return fmt.Errorf("must specify either name or handle")
 		}
@@ -194,8 +194,8 @@ func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 	family, table, _ := getTable(ctx, chain.Family, chain.Table)
 
 	// Special case for delete-by-handle
-	if verb == deleteVerb && chain.Handle != nil {
-		fmt.Fprintf(writer, "delete chain %s %s handle %d", family, table, *chain.Handle)
+	if (verb == deleteVerb || verb == destroyVerb) && chain.Handle != nil {
+		fmt.Fprintf(writer, "%s chain %s %s handle %d", verb, family, table, *chain.Handle)
 		return
 	}
 
@@ -291,7 +291,7 @@ func (rule *Rule) validate(verb verb, ctx *nftContext) error {
 		if rule.Handle == nil {
 			return fmt.Errorf("must specify Handle with %s", verb)
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 		if rule.Handle == nil {
 			return fmt.Errorf("must specify Handle with %s", verb)
 		}
@@ -355,18 +355,20 @@ func (set *Set) validate(verb verb, ctx *nftContext) error {
 	}
 	switch verb {
 	case addVerb, createVerb:
+		if set.Name == "" {
+			return fmt.Errorf("no name specified for set")
+		}
 		if (set.Type == "" && set.TypeOf == "") || (set.Type != "" && set.TypeOf != "") {
 			return fmt.Errorf("set must specify either Type or TypeOf")
 		}
 		if set.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
-		fallthrough
 	case flushVerb:
 		if set.Name == "" {
 			return fmt.Errorf("no name specified for set")
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 		if set.Name == "" && set.Handle == nil {
 			return fmt.Errorf("must specify either name or handle")
 		}
@@ -381,8 +383,8 @@ func (set *Set) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	family, table, _ := getTable(ctx, set.Family, set.Table)
 
 	// Special case for delete-by-handle
-	if verb == deleteVerb && set.Handle != nil {
-		fmt.Fprintf(writer, "delete set %s %s handle %d", family, table, *set.Handle)
+	if (verb == deleteVerb || verb == destroyVerb) && set.Handle != nil {
+		fmt.Fprintf(writer, "%v set %s %s handle %d", verb, family, table, *set.Handle)
 		return
 	}
 
@@ -452,18 +454,20 @@ func (mapObj *Map) validate(verb verb, ctx *nftContext) error {
 	}
 	switch verb {
 	case addVerb, createVerb:
+		if mapObj.Name == "" {
+			return fmt.Errorf("no name specified for map")
+		}
 		if (mapObj.Type == "" && mapObj.TypeOf == "") || (mapObj.Type != "" && mapObj.TypeOf != "") {
 			return fmt.Errorf("map must specify either Type or TypeOf")
 		}
 		if mapObj.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
-		fallthrough
 	case flushVerb:
 		if mapObj.Name == "" {
 			return fmt.Errorf("no name specified for map")
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 		if mapObj.Name == "" && mapObj.Handle == nil {
 			return fmt.Errorf("must specify either name or handle")
 		}
@@ -478,8 +482,8 @@ func (mapObj *Map) writeOperation(verb verb, ctx *nftContext, writer io.Writer) 
 	family, table, _ := getTable(ctx, mapObj.Family, mapObj.Table)
 
 	// Special case for delete-by-handle
-	if verb == deleteVerb && mapObj.Handle != nil {
-		fmt.Fprintf(writer, "delete map %s %s handle %d", family, table, *mapObj.Handle)
+	if (verb == deleteVerb || verb == destroyVerb) && mapObj.Handle != nil {
+		fmt.Fprintf(writer, "%v map %s %s handle %d", verb, family, table, *mapObj.Handle)
 		return
 	}
 
@@ -614,7 +618,7 @@ func (element *Element) validate(verb verb, ctx *nftContext) error {
 		if element.Map != "" && len(element.Value) == 0 {
 			return fmt.Errorf("no map value specified for map element")
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 	default:
 		return fmt.Errorf("%s is not implemented for elements", verb)
 	}
@@ -692,7 +696,7 @@ func (flowtable *Flowtable) validate(verb verb, ctx *nftContext) error {
 		if flowtable.Handle != nil {
 			return fmt.Errorf("cannot specify Handle in %s operation", verb)
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 		if flowtable.Name == "" && flowtable.Handle == nil {
 			return fmt.Errorf("must specify either name or handle")
 		}
@@ -707,7 +711,7 @@ func (flowtable *Flowtable) writeOperation(verb verb, ctx *nftContext, writer io
 	family, table, _ := getTable(ctx, flowtable.Family, flowtable.Table)
 
 	// Special case for delete-by-handle
-	if verb == deleteVerb && flowtable.Handle != nil {
+	if (verb == deleteVerb || verb == destroyVerb) && flowtable.Handle != nil {
 		fmt.Fprintf(writer, "delete flowtable %s %s handle %d", family, table, *flowtable.Handle)
 		return
 	}
@@ -808,7 +812,7 @@ func (counter *Counter) validate(verb verb, ctx *nftContext) error {
 		if counter.Packets == nil && counter.Bytes != nil {
 			return fmt.Errorf("cannot specify Bytes without Packets in %s operation", verb)
 		}
-	case deleteVerb:
+	case deleteVerb, destroyVerb:
 		if counter.Name == "" && counter.Handle == nil {
 			return fmt.Errorf("neither counter name nor handle specified")
 		}
@@ -826,8 +830,8 @@ func (counter *Counter) writeOperation(verb verb, ctx *nftContext, writer io.Wri
 	family, table, _ := getTable(ctx, counter.Family, counter.Table)
 
 	// Special case for delete-by-handle
-	if verb == deleteVerb && counter.Handle != nil {
-		fmt.Fprintf(writer, "delete counter %s %s handle %d", family, table, *counter.Handle)
+	if (verb == deleteVerb || verb == destroyVerb) && counter.Handle != nil {
+		fmt.Fprintf(writer, "%s counter %s %s handle %d", verb, family, table, *counter.Handle)
 		return
 	}
 

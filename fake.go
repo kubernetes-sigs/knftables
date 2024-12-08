@@ -286,11 +286,10 @@ func (fake *Fake) run(tx *Transaction) (map[Family]map[string]*FakeTable, error)
 					updatedTables[family] = make(map[string]*FakeTable)
 				}
 				updatedTables[family][tableName] = table
-			case deleteVerb:
-				// checkExists would have failed if the table didn't
-				// already exist, so we know updatedTables[family] is
-				// non-nil.
-				delete(updatedTables[family], tableName)
+			case deleteVerb, destroyVerb:
+				if table != nil {
+					delete(updatedTables[family], tableName)
+				}
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
@@ -316,7 +315,7 @@ func (fake *Fake) run(tx *Transaction) (map[Family]map[string]*FakeTable, error)
 				table.Flowtables[obj.Name] = &FakeFlowtable{
 					Flowtable: flowtable,
 				}
-			case deleteVerb:
+			case deleteVerb, destroyVerb:
 				// FIXME delete-by-handle
 				delete(table.Flowtables, obj.Name)
 			default:
@@ -346,7 +345,7 @@ func (fake *Fake) run(tx *Transaction) (map[Family]map[string]*FakeTable, error)
 				}
 			case flushVerb:
 				existingChain.Rules = nil
-			case deleteVerb:
+			case deleteVerb, destroyVerb:
 				// FIXME delete-by-handle
 				delete(table.Chains, obj.Name)
 			default:
@@ -434,7 +433,7 @@ func (fake *Fake) run(tx *Transaction) (map[Family]map[string]*FakeTable, error)
 				}
 			case flushVerb:
 				existingSet.Elements = nil
-			case deleteVerb:
+			case deleteVerb, destroyVerb:
 				// FIXME delete-by-handle
 				delete(table.Sets, obj.Name)
 			default:
@@ -463,7 +462,7 @@ func (fake *Fake) run(tx *Transaction) (map[Family]map[string]*FakeTable, error)
 				}
 			case flushVerb:
 				existingMap.Elements = nil
-			case deleteVerb:
+			case deleteVerb, destroyVerb:
 				// FIXME delete-by-handle
 				delete(table.Maps, obj.Name)
 			default:
@@ -491,11 +490,11 @@ func (fake *Fake) run(tx *Transaction) (map[Family]map[string]*FakeTable, error)
 					} else {
 						existingSet.Elements = append(existingSet.Elements, &element)
 					}
-				case deleteVerb:
+				case deleteVerb, destroyVerb:
 					element := *obj
 					if i := findElement(existingSet.Elements, element.Key); i != -1 {
 						existingSet.Elements = append(existingSet.Elements[:i], existingSet.Elements[i+1:]...)
-					} else {
+					} else if op.verb == deleteVerb {
 						return nil, notFoundError("no such element %q", strings.Join(element.Key, " . "))
 					}
 				default:
@@ -520,11 +519,11 @@ func (fake *Fake) run(tx *Transaction) (map[Family]map[string]*FakeTable, error)
 					} else {
 						existingMap.Elements = append(existingMap.Elements, &element)
 					}
-				case deleteVerb:
+				case deleteVerb, destroyVerb:
 					element := *obj
 					if i := findElement(existingMap.Elements, element.Key); i != -1 {
 						existingMap.Elements = append(existingMap.Elements[:i], existingMap.Elements[i+1:]...)
-					} else {
+					} else if op.verb == deleteVerb {
 						return nil, notFoundError("no such element %q", strings.Join(element.Key, " . "))
 					}
 				default:
@@ -597,7 +596,7 @@ func (fake *Fake) checkTable(updatedTables map[Family]map[string]*FakeTable, fam
 
 func checkExists(verb verb, objectType, name string, exists bool) error {
 	switch verb {
-	case addVerb:
+	case addVerb, destroyVerb:
 		// It's fine if the object either exists or doesn't
 		return nil
 	case createVerb:
