@@ -553,3 +553,65 @@ func TestFeatures(t *testing.T) {
 		})
 	}
 }
+
+func TestListCounters(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		nftOutput        string
+		nftError         string
+		expectedCounters []*Counter
+	}{
+		{
+			name:             "no counters",
+			nftOutput:        `{"nftables": [{"metainfo": {"version": "1.0.6", "release_name": "Lester Gooch #5", "json_schema_version": 1}}]}`,
+			expectedCounters: []*Counter{},
+		},
+		{
+			name:      "single counter with comment",
+			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.6", "release_name": "Lester Gooch #5", "json_schema_version": 1}}, {"counter": {"family": "ip", "name": "test-counter", "table": "testing", "handle": 1, "comment": "test-counter-comment", "packets": 100, "bytes": 5000}}]}`,
+			expectedCounters: []*Counter{
+				{Name: "test-counter", Comment: PtrTo("test-counter-comment"), Packets: PtrTo[uint64](100), Bytes: PtrTo[uint64](5000), Handle: PtrTo(1)},
+			},
+		},
+		{
+			name:      "multiple counters without comments",
+			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.6", "release_name": "Lester Gooch #5", "json_schema_version": 1}}, {"counter": {"family": "ip", "name": "test-counter-1", "table": "testing", "handle": 2, "packets": 10, "bytes": 5000}}, {"counter": {"family": "ip", "name": "test-counter-2", "table": "testing", "handle": 3, "packets": 20, "bytes": 10000}}]}`,
+			expectedCounters: []*Counter{
+				{Name: "test-counter-1", Packets: PtrTo[uint64](10), Bytes: PtrTo[uint64](5000), Handle: PtrTo(2)},
+				{Name: "test-counter-2", Packets: PtrTo[uint64](20), Bytes: PtrTo[uint64](10000), Handle: PtrTo(3)},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
+
+			var err error
+			if tc.nftError != "" {
+				err = fmt.Errorf(tc.nftError)
+			}
+			fexec.expected = append(fexec.expected,
+				expectedCmd{
+					args:   []string{"/nft", "--json", "list", "counters", "table", "ip", "testing"},
+					stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
+					err:    err,
+				},
+			)
+
+			counters, err := nft.ListCounters(context.Background())
+			if err != nil {
+				if tc.nftError == "" {
+					t.Errorf("unexpected error: %v", err)
+				}
+				return
+			} else if tc.nftError != "" {
+				t.Errorf("unexpected non-error")
+				return
+			}
+
+			diff := cmp.Diff(tc.expectedCounters, counters)
+			if diff != "" {
+				t.Errorf("unexpected result:\n%s", diff)
+			}
+		})
+	}
+}

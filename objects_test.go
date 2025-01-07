@@ -104,6 +104,12 @@ func TestObjects(t *testing.T) {
 			err:    "not implemented",
 		},
 		{
+			name:   "invalid reset table",
+			verb:   resetVerb,
+			object: &Table{},
+			err:    "not implemented",
+		},
+		{
 			name:   "invalid add table with Handle",
 			verb:   addVerb,
 			object: &Table{Handle: PtrTo(5)},
@@ -158,6 +164,14 @@ func TestObjects(t *testing.T) {
 		{
 			name: "flush flowtable",
 			verb: flushVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			},
+			err: "not implemented",
+		},
+		{
+			name: "invalid reset flowtable",
+			verb: resetVerb,
 			object: &Flowtable{
 				Name: "myflowtable",
 			},
@@ -287,6 +301,12 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "invalid insert chain",
 			verb:   insertVerb,
+			object: &Chain{Name: "mychain"},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid reset chain",
+			verb:   resetVerb,
 			object: &Chain{Name: "mychain"},
 			err:    "not implemented",
 		},
@@ -425,6 +445,12 @@ func TestObjects(t *testing.T) {
 			err:    "not implemented",
 		},
 		{
+			name:   "invalid reset rule",
+			verb:   resetVerb,
+			object: &Rule{Chain: "mychain", Rule: "drop"},
+			err:    "not implemented",
+		},
+		{
 			name:   "invalid add rule with no Chain",
 			verb:   addVerb,
 			object: &Rule{Rule: "drop"},
@@ -523,6 +549,12 @@ func TestObjects(t *testing.T) {
 		{
 			name:   "invalid insert set",
 			verb:   insertVerb,
+			object: &Set{Name: "myset", Type: "ipv4_addr"},
+			err:    "not implemented",
+		},
+		{
+			name:   "invalid reset set",
+			verb:   resetVerb,
 			object: &Set{Name: "myset", Type: "ipv4_addr"},
 			err:    "not implemented",
 		},
@@ -634,6 +666,12 @@ func TestObjects(t *testing.T) {
 			err:    "not implemented",
 		},
 		{
+			name:   "invalid reset map",
+			verb:   resetVerb,
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+			err:    "not implemented",
+		},
+		{
 			name:   "invalid add map without Name",
 			verb:   addVerb,
 			object: &Map{Type: "ipv4_addr : ipv4_addr"},
@@ -738,6 +776,12 @@ func TestObjects(t *testing.T) {
 			err:    "not implemented",
 		},
 		{
+			name:   "invalid reset element",
+			verb:   resetVerb,
+			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
+			err:    "not implemented",
+		},
+		{
 			name:   "invalid insert element",
 			verb:   insertVerb,
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
@@ -748,6 +792,103 @@ func TestObjects(t *testing.T) {
 			verb:   replaceVerb,
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
 			err:    "not implemented",
+		},
+		// Counters
+		{
+			name:   "add counter with comment",
+			verb:   addVerb,
+			object: &Counter{Name: "test-counter", Comment: PtrTo("counter for unit tests")},
+			out:    "add counter ip mytable test-counter { comment \"counter for unit tests\" ; }",
+		},
+		{
+			name:   "add counter without comment",
+			verb:   addVerb,
+			object: &Counter{Name: "test-counter"},
+			out:    "add counter ip mytable test-counter",
+		},
+		{
+			name:   "add counter with comment, packets and bytes.",
+			verb:   addVerb,
+			object: &Counter{Name: "test-counter", Comment: PtrTo("counter for unit tests"), Packets: PtrTo[uint64](100), Bytes: PtrTo[uint64](500)},
+			out:    "add counter ip mytable test-counter { packets 100 bytes 500 ; comment \"counter for unit tests\" ; }",
+		},
+		{
+			name:   "invalid add counter without name",
+			verb:   addVerb,
+			object: &Counter{},
+			err:    "no counter name specified",
+		},
+		{
+			name:   "invalid add counter with handle",
+			verb:   addVerb,
+			object: &Counter{Name: "dummy-counter", Handle: PtrTo(100)},
+			err:    "cannot specify Handle in add operation",
+		},
+		{
+			name:   "create counter with comment",
+			verb:   createVerb,
+			object: &Counter{Name: "test-counter", Comment: PtrTo("counter for unit tests")},
+			out:    "create counter ip mytable test-counter { comment \"counter for unit tests\" ; }",
+		},
+		{
+			name:   "invalid crete counter with packets without bytes",
+			verb:   createVerb,
+			object: &Counter{Name: "test-counter", Packets: PtrTo[uint64](100)},
+			err:    "cannot specify Packets without Bytes in create operation",
+		},
+		{
+			name:   "invalid crete counter with bytes without packets",
+			verb:   createVerb,
+			object: &Counter{Name: "test-counter", Bytes: PtrTo[uint64](1500)},
+			err:    "cannot specify Bytes without Packets in create operation",
+		},
+		{
+			name:   "create counter without name",
+			verb:   createVerb,
+			object: &Counter{},
+			err:    "no counter name specified",
+		},
+		{
+			name:   "delete counter by name",
+			verb:   deleteVerb,
+			object: &Counter{Name: "test-counter"},
+			out:    "delete counter ip mytable test-counter",
+		},
+		{
+			name:   "delete counter by handle",
+			verb:   deleteVerb,
+			object: &Counter{Name: "test-counter", Handle: PtrTo(5)},
+			out:    "delete counter ip mytable handle 5",
+		},
+		{
+			name:   "invalid insert counter",
+			verb:   insertVerb,
+			object: &Counter{Name: "test-counter"},
+			err:    "insert is not implemented for counters",
+		},
+		{
+			name:   "invalid replace counter",
+			verb:   replaceVerb,
+			object: &Counter{Name: "test-counter"},
+			err:    "replace is not implemented for counters",
+		},
+		{
+			name:   "invalid flush counter",
+			verb:   flushVerb,
+			object: &Counter{Name: "test-counter"},
+			err:    "flush is not implemented for counters",
+		},
+		{
+			name:   "invalid reset counter",
+			verb:   resetVerb,
+			object: &Counter{Name: "test-counter"},
+			out:    "reset counter ip mytable test-counter",
+		},
+		{
+			name:   "invalid reset without name",
+			verb:   resetVerb,
+			object: &Counter{},
+			err:    "no counter name specified",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -780,8 +921,8 @@ func TestObjects(t *testing.T) {
 		})
 	}
 
-	// add, create, flush, insert, replace, delete
-	numVerbs := 6
+	// add, create, flush, insert, replace, delete, reset
+	numVerbs := 7
 	for objType, verbs := range tested {
 		if len(verbs) != numVerbs {
 			t.Errorf("expected to test %d verbs for %s, got %d (%v)", numVerbs, objType, len(verbs), verbs)

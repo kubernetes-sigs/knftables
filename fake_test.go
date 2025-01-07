@@ -92,7 +92,12 @@ func TestFakeRun(t *testing.T) {
 		Name:    "myflowtable",
 		Devices: []string{"eth0", "eth1"},
 	})
-
+	tx.Add(&Counter{
+		Name:    "test-counter",
+		Comment: PtrTo("test counter comment"),
+		Packets: PtrTo[uint64](300),
+		Bytes:   PtrTo[uint64](5000),
+	})
 	// The transaction should contain exactly those commands, in order
 	expected := strings.TrimPrefix(dedent.Dedent(`
 		add table ip kube-proxy
@@ -107,6 +112,7 @@ func TestFakeRun(t *testing.T) {
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add flowtable ip kube-proxy myflowtable { devices = { eth0, eth1 } ; }
+		add counter ip kube-proxy test-counter { packets 300 bytes 5000 ; comment "test counter comment" ; }
 		`), "\n")
 	diff := cmp.Diff(expected, tx.String())
 	if diff != "" {
@@ -177,6 +183,7 @@ func TestFakeRun(t *testing.T) {
 		add chain ip kube-proxy anotherchain
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
+		add counter ip kube-proxy test-counter { packets 300 bytes 5000 ; comment "test counter comment" ; }
 		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
@@ -203,7 +210,8 @@ func TestFakeRun(t *testing.T) {
 
 	tx = fake.NewTransaction()
 	tx.Delete(ruleToDelete)
-	expected = fmt.Sprintf("delete rule ip kube-proxy chain handle %d\n", *ruleToDelete.Handle)
+	tx.Reset(&Counter{Name: "test-counter"})
+	expected = fmt.Sprintf("delete rule ip kube-proxy chain handle %d\nreset counter ip kube-proxy test-counter\n", *ruleToDelete.Handle)
 	diff = cmp.Diff(expected, tx.String())
 	if diff != "" {
 		t.Errorf("unexpected transaction content:\n%s", diff)
@@ -218,6 +226,7 @@ func TestFakeRun(t *testing.T) {
 		add chain ip kube-proxy anotherchain
 		add chain ip kube-proxy chain { comment "foo" ; }
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
+		add counter ip kube-proxy test-counter { packets 0 bytes 0 ; comment "test counter comment" ; }
 		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
@@ -612,6 +621,8 @@ func TestFakeParseDump(t *testing.T) {
 			add rule ip kube-proxy chain masquerade comment "comment"
 			add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 			add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
+			add counter ip kube-proxy test-counter-1 { comment "test counter 1 comment" ; }
+			add counter ip kube-proxy test-counter-2 { packets 100 bytes 1250 ; }
 			`,
 		},
 		{
