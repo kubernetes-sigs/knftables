@@ -691,3 +691,84 @@ func (flowtable *Flowtable) parse(line string) error {
 	}
 	return nil
 }
+
+// nft add counter [family] table name [{ [ packets packets bytes bytes ; ] [ comment comment ; }]
+// ([^ ]*)(?: {(?: packets ([0-9]*) bytes ([0-9]*) ;)?(?: comment (".*") ;)? })?
+var counterRegexp = regexp.MustCompile(fmt.Sprintf(
+	`%s(?: {(?: packets %s bytes %s ;)?(?: comment %s ;)? })?`,
+	noSpaceGroup, numberGroup, numberGroup, commentGroup))
+
+func (counter *Counter) parse(line string) error {
+	match := counterRegexp.FindStringSubmatch(line)
+	if match == nil {
+		return fmt.Errorf("failed parsing table add command")
+	}
+	counter.Name = match[1]
+	if match[2] != "" {
+		counter.Packets = PtrTo(uint64(*parseInt(match[2])))
+	}
+	if match[3] != "" {
+		counter.Bytes = PtrTo(uint64(*parseInt(match[3])))
+	}
+	if match[4] != "" {
+		counter.Comment = getComment(match[4])
+	}
+	return nil
+}
+
+// Object implementation for Counter
+func (counter *Counter) validate(verb verb) error {
+	switch verb {
+	case addVerb, createVerb:
+		if counter.Name == "" {
+			return fmt.Errorf("no counter name specified")
+		}
+		if counter.Handle != nil {
+			return fmt.Errorf("cannot specify Handle in %s operation", verb)
+		}
+		if counter.Packets != nil && counter.Bytes == nil {
+			return fmt.Errorf("cannot specify Packets without Bytes in %s operation", verb)
+		}
+		if counter.Packets == nil && counter.Bytes != nil {
+			return fmt.Errorf("cannot specify Bytes without Packets in %s operation", verb)
+		}
+	case deleteVerb:
+		if counter.Name == "" && counter.Handle == nil {
+			return fmt.Errorf("neither counter name nor handle specified")
+		}
+	case resetVerb:
+		if counter.Name == "" {
+			return fmt.Errorf("no counter name specified")
+		}
+	default:
+		return fmt.Errorf("%s is not implemented for counters", verb)
+	}
+	return nil
+}
+
+func (counter *Counter) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
+	// Special case for delete-by-handle
+	if verb == deleteVerb && counter.Handle != nil {
+		fmt.Fprintf(writer, "delete counter %s %s handle %d", ctx.family, ctx.table, *counter.Handle)
+		return
+	}
+
+	fmt.Fprintf(writer, "%s counter %s %s ", verb, ctx.family, ctx.table)
+	switch verb {
+	case addVerb, createVerb:
+		fmt.Fprint(writer, counter.Name)
+		if counter.Comment != nil || counter.Packets != nil || counter.Bytes != nil {
+			fmt.Fprintf(writer, " {")
+			if counter.Packets != nil && counter.Bytes != nil {
+				fmt.Fprintf(writer, " packets %d bytes %d ;", *counter.Packets, *counter.Bytes)
+			}
+			if counter.Comment != nil && (verb == addVerb || verb == createVerb) {
+				fmt.Fprintf(writer, " comment %q ;", *counter.Comment)
+			}
+			fmt.Fprintf(writer, " }")
+		}
+	default:
+		fmt.Fprint(writer, counter.Name)
+	}
+	fmt.Fprintf(writer, "\n")
+}

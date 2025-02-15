@@ -438,3 +438,24 @@ type Flowtable struct {
 	// deleting it. When adding a new object, this must be nil
 	Handle *int
 }
+
+// Counter represents named counter
+type Counter struct {
+	// Name is the name of the named counter
+	Name string
+
+	// Comment is an optional comment for the counter
+	Comment *string
+
+	// Packets represents numbers of packets tracked by the counter.
+	// This will be filled in by ListCounters() but can be nil when creating new counter.
+	Packets *uint64
+
+	// Bytes represents numbers of bytes tracked by the counter.
+	// This will be filled in by ListCounters() but can be nil when creating new counter.
+	Bytes *uint64
+
+	// Handle is an identifier that can be used to uniquely identify an object when
+	// deleting it. When adding a new object, this must be nil
+	Handle *int
+}

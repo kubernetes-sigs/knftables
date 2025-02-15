@@ -62,11 +62,19 @@ type FakeTable struct {
 
 	// Maps contains the table's maps, keyed by name
 	Maps map[string]*FakeMap
+
+	// Counters contains the table's counters, keyed by name
+	Counters map[string]*FakeCounter
 }
 
 // FakeFlowtable wraps Flowtable for the Fake implementation
 type FakeFlowtable struct {
 	Flowtable
+}
+
+// FakeCounter wraps Counter for the Fake implementation
+type FakeCounter struct {
+	Counter
 }
 
 // FakeChain wraps Chain for the Fake implementation
@@ -132,6 +140,10 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 		}
 	case "map", "maps":
 		for name := range fake.Table.Maps {
+			result = append(result, name)
+		}
+	case "counter", "counters":
+		for name := range fake.Table.Counters {
 			result = append(result, name)
 		}
 
@@ -253,6 +265,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 					Chains:     make(map[string]*FakeChain),
 					Sets:       make(map[string]*FakeSet),
 					Maps:       make(map[string]*FakeMap),
+					Counters:   make(map[string]*FakeCounter),
 				}
 			case deleteVerb:
 				updatedTable = nil
@@ -466,6 +479,49 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 					return nil, fmt.Errorf("unhandled operation %q", op.verb)
 				}
 			}
+		case *Counter:
+			existingCounter := updatedTable.Counters[obj.Name]
+			switch op.verb {
+			case addVerb, createVerb:
+				err := checkExists(op.verb, "counter", obj.Name, existingCounter != nil)
+				if err != nil {
+					return nil, err
+				}
+				if existingCounter != nil {
+					continue
+				}
+				obj.Handle = PtrTo(fake.nextHandle)
+				updatedTable.Counters[obj.Name] = &FakeCounter{*obj}
+			case resetVerb:
+				err := checkExists(op.verb, "counter", obj.Name, existingCounter != nil)
+				if err != nil {
+					return nil, err
+				}
+				updatedTable.Counters[obj.Name].Packets = PtrTo[uint64](0)
+				updatedTable.Counters[obj.Name].Bytes = PtrTo[uint64](0)
+			case deleteVerb:
+				if obj.Handle != nil {
+					var found bool
+					for _, counter := range updatedTable.Counters {
+						if *counter.Handle == *obj.Handle {
+							found = true
+							delete(updatedTable.Counters, counter.Name)
+							break
+						}
+					}
+					if !found {
+						return nil, notFoundError("no such counter %q", obj.Name)
+					}
+				} else {
+					err := checkExists(op.verb, "counter", obj.Name, existingCounter != nil)
+					if err != nil {
+						return nil, err
+					}
+					delete(updatedTable.Counters, obj.Name)
+				}
+			default:
+				return nil, fmt.Errorf("unhandled operation %q", op.verb)
+			}
 		default:
 			return nil, fmt.Errorf("unhandled object type %T", op.obj)
 		}
@@ -551,6 +607,7 @@ func (fake *Fake) Dump() string {
 	chains := sortKeys(table.Chains)
 	sets := sortKeys(table.Sets)
 	maps := sortKeys(table.Maps)
+	counters := sortKeys(table.Counters)
 
 	// Write out all of the object adds first.
 
@@ -571,7 +628,10 @@ func (fake *Fake) Dump() string {
 		m := table.Maps[mname]
 		m.writeOperation(addVerb, &fake.nftContext, buf)
 	}
-
+	for _, cname := range counters {
+		m := table.Counters[cname]
+		m.writeOperation(addVerb, &fake.nftContext, buf)
+	}
 	// Now write their contents.
 
 	for _, cname := range chains {
@@ -642,6 +702,8 @@ func (fake *Fake) ParseDump(data string) (err error) {
 			obj = &Set{}
 		case "element":
 			obj = &Element{}
+		case "counter":
+			obj = &Counter{}
 		default:
 			return fmt.Errorf("unknown object %s", match[1])
 		}
@@ -695,6 +757,7 @@ func (table *FakeTable) copy() *FakeTable {
 		Chains:     make(map[string]*FakeChain),
 		Sets:       make(map[string]*FakeSet),
 		Maps:       make(map[string]*FakeMap),
+		Counters:   make(map[string]*FakeCounter),
 	}
 	for name, flowtable := range table.Flowtables {
 		tcopy.Flowtables[name] = &FakeFlowtable{
@@ -719,7 +782,9 @@ func (table *FakeTable) copy() *FakeTable {
 			Elements: append([]*Element{}, mapObj.Elements...),
 		}
 	}
-
+	for name, counter := range table.Counters {
+		tcopy.Counters[name] = counter
+	}
 	return tcopy
 }
 
@@ -741,4 +806,13 @@ func (m *FakeMap) FindElement(key ...string) *Element {
 		return nil
 	}
 	return m.Elements[index]
+}
+
+// ListCounters is part of Interface
+func (fake *Fake) ListCounters(_ context.Context) ([]*Counter, error) {
+	counters := make([]*Counter, len(fake.Table.Counters))
+	for _, fakeCounter := range fake.Table.Counters {
+		counters = append(counters, PtrTo(fakeCounter.Counter))
+	}
+	return counters, nil
 }
