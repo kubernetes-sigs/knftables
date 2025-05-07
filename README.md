@@ -128,6 +128,7 @@ in the `nft` binary. Currently-supported operations are:
 - `tx.Add()`: adds an object, which may already exist, as with `nft add`
 - `tx.Create()`: creates an object, which must not already exist, as with `nft create`
 - `tx.Flush()`: flushes the contents of a table/chain/set/map, as with `nft flush`
+- `tx.Reset()`: resets a counter, as with `nft reset`
 - `tx.Delete()`: deletes an object, as with `nft delete`
 - `tx.Insert()`: inserts a rule before another rule, as with `nft insert rule`
 - `tx.Replace()`: replaces a rule, as with `nft replace rule`
@@ -144,6 +145,7 @@ The currently-supported objects are:
 - `Set`
 - `Map`
 - `Element`
+- `Counter`
 
 Optional fields in objects can be filled in with the help of the
 `PtrTo()` function, which just returns a pointer to its argument.
@@ -164,8 +166,7 @@ the current state of the fake nftables database.
 
 ## Missing APIs
 
-Various top-level object types are not yet supported (notably the
-"stateful objects" like `counter`).
+Various top-level object types are not yet supported.
 
 Most IPTables libraries have an API for "add this rule only if it
 doesn't already exist", but that does not seem as useful in nftables

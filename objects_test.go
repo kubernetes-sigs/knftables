@@ -831,13 +831,13 @@ func TestObjects(t *testing.T) {
 			out:    "create counter ip mytable test-counter { comment \"counter for unit tests\" ; }",
 		},
 		{
-			name:   "invalid crete counter with packets without bytes",
+			name:   "invalid create counter with packets without bytes",
 			verb:   createVerb,
 			object: &Counter{Name: "test-counter", Packets: PtrTo[uint64](100)},
 			err:    "cannot specify Packets without Bytes in create operation",
 		},
 		{
-			name:   "invalid crete counter with bytes without packets",
+			name:   "invalid create counter with bytes without packets",
 			verb:   createVerb,
 			object: &Counter{Name: "test-counter", Bytes: PtrTo[uint64](1500)},
 			err:    "cannot specify Bytes without Packets in create operation",
