@@ -51,6 +51,10 @@ if err != nil {
 }
 ```
 
+`knftables.New` also takes a comma-separated list of options after the
+family and table name; see the documentation for that function for
+more information.
+
 (If you want to operate on multiple tables or multiple nftables
 families, you have two options: you can either create separate
 `Interface` objects for each table, or you can create a single

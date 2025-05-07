@@ -480,6 +480,7 @@ func TestListElements(t *testing.T) {
 func TestFeatures(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
+		options  []Option
 		commands []expectedCmd
 		result   *nftContext
 	}{
@@ -540,11 +541,29 @@ func TestFeatures(t *testing.T) {
 				noObjectComments: true,
 			},
 		},
+		{
+			name:    "NoObjectCommentEmulation",
+			options: []Option{NoObjectCommentEmulation},
+			commands: []expectedCmd{
+				{
+					args: []string{
+						"/nft", "--version",
+					},
+					stdout: "nftables v1.0.7 (Old Doc Yak)\n",
+				},
+				{
+					args:  []string{"/nft", "--check", "-f", "-"},
+					stdin: "add table ip testing { comment \"test\" ; }\n",
+					err:   fmt.Errorf("Error: syntax error, unexpected comment"),
+				},
+			},
+			result: nil,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fexec := newFakeExec(t)
 			fexec.expected = tc.commands
-			nft, err := newInternal(IPv4Family, "testing", fexec)
+			nft, err := newInternal(IPv4Family, "testing", fexec, tc.options...)
 			if err != nil {
 				if tc.result != nil {
 					t.Fatalf("Unexpected error creating Interface: %v", err)
