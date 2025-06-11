@@ -26,7 +26,7 @@ import (
 	"sync"
 )
 
-// Interface is an interface for running nftables commands against a given family and table.
+// Interface is an interface for running nftables commands
 type Interface interface {
 	// NewTransaction returns a new (empty) Transaction
 	NewTransaction() *Transaction
@@ -43,7 +43,7 @@ type Interface interface {
 	// List returns a list of the names of the objects of objectType ("chain", "set",
 	// "map" or "counter") in the table. If there are no such objects, this will return an empty
 	// list and no error.
-	List(ctx context.Context, objectType string) ([]string, error)
+	List(ctx context.Context, family Family, table string, objectType string) ([]string, error)
 
 	// ListRules returns a list of the rules in a chain, in order. If no chain name is
 	// specified, then all rules within the table will be returned. Note that at the
@@ -52,20 +52,26 @@ type Interface interface {
 	// the handles of rules if they have unique comments to recognize them by, or if
 	// you know the order of the rules within the chain. If the chain exists but
 	// contains no rules, this will return an empty list and no error.
-	ListRules(ctx context.Context, chain string) ([]*Rule, error)
+	ListRules(ctx context.Context, family Family, table string, chain string) ([]*Rule, error)
 
 	// ListElements returns a list of the elements in a set or map. (objectType should
 	// be "set" or "map".) If the set/map exists but contains no elements, this will
 	// return an empty list and no error.
-	ListElements(ctx context.Context, objectType, name string) ([]*Element, error)
+	ListElements(ctx context.Context, family Family, table string, objectType, name string) ([]*Element, error)
 
 	// ListCounters returns a list of the counters.
-	ListCounters(ctx context.Context) ([]*Counter, error)
+	ListCounters(ctx context.Context, family Family, table string) ([]*Counter, error)
+
+	// SetDefaultFamily will set the family that will be used by default in the operations inside the transactions
+	SetDefaultFamily(family Family)
+
+	// SetDefaultTable will set the table that will be used by default in the operations inside the transactions
+	SetDefaultTable(table string)
 }
 
 type nftContext struct {
-	family Family
-	table  string
+	defaultFamily Family
+	defaultTable  string
 
 	// noObjectComments is true if comments on Table/Chain/Set/Map are not supported.
 	// (Comments on Rule and Element are always supported.)
@@ -90,8 +96,8 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 
 	nft := &realNFTables{
 		nftContext: nftContext{
-			family: family,
-			table:  table,
+			defaultFamily: family,
+			defaultTable:  table,
 		},
 		buffer: &bytes.Buffer{},
 		exec:   execer,
@@ -115,12 +121,14 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 	// to support object comments.
 	tx := nft.NewTransaction()
 	tx.Add(&Table{
+		Name:    "knftables-test",
+		Family:  InetFamily,
 		Comment: PtrTo("test"),
 	})
 	if err := nft.Check(context.TODO(), tx); err != nil {
 		// Try again, checking just that (a) nft works, (b) we have permission.
 		tx := nft.NewTransaction()
-		tx.Add(&Table{})
+		tx.Add(&Table{Name: "knftables-test", Family: InetFamily})
 		if err := nft.Check(context.TODO(), tx); err != nil {
 			return nil, fmt.Errorf("could not run nftables command: %w", err)
 		}
@@ -133,8 +141,8 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 
 // New creates a new nftables.Interface for interacting with the given table. If nftables
 // is not available/usable on the current host, it will return an error.
-func New(family Family, table string) (Interface, error) {
-	return newInternal(family, table, realExec{})
+func New() (Interface, error) {
+	return newInternal("", "", realExec{})
 }
 
 // NewTransaction is part of Interface
@@ -276,7 +284,14 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 }
 
 // List is part of Interface.
-func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
+func (nft *realNFTables) List(ctx context.Context, family Family, table string, objectType string) ([]string, error) {
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = nft.defaultFamily
+	}
+	if table == "" {
+		table = nft.defaultTable
+	}
 	// All currently-existing nftables object types have plural forms that are just
 	// the singular form plus 's'.
 	var typeSingular, typePlural string
@@ -288,7 +303,7 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 		typePlural = objectType + "s"
 	}
 
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", typePlural, string(nft.family))
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", typePlural, string(family))
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -302,7 +317,7 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 	var result []string
 	for _, obj := range objects {
 		objTable, _ := jsonVal[string](obj, "table")
-		if objTable != nft.table {
+		if objTable != table {
 			continue
 		}
 
@@ -314,13 +329,20 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 }
 
 // ListRules is part of Interface
-func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
+func (nft *realNFTables) ListRules(ctx context.Context, family Family, table string, chain string) ([]*Rule, error) {
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = nft.defaultFamily
+	}
+	if table == "" {
+		table = nft.defaultTable
+	}
 	// If no chain is given, return all rules from within the table.
 	var cmd *exec.Cmd
 	if chain == "" {
-		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(family), table)
 	} else {
-		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(family), table, chain)
 	}
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
@@ -360,8 +382,15 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 }
 
 // ListElements is part of Interface
-func (nft *realNFTables) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", objectType, string(nft.family), nft.table, name)
+func (nft *realNFTables) ListElements(ctx context.Context, family Family, table string, objectType, name string) ([]*Element, error) {
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = nft.defaultFamily
+	}
+	if table == "" {
+		table = nft.defaultTable
+	}
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", objectType, string(family), table, name)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -429,6 +458,16 @@ func (nft *realNFTables) ListElements(ctx context.Context, objectType, name stri
 		elements = append(elements, elem)
 	}
 	return elements, nil
+}
+
+// SetDefaultFamily is part of Interface
+func (nft *realNFTables) SetDefaultFamily(family Family) {
+	nft.defaultFamily = family
+}
+
+// SetDefaultTable is part of Interface
+func (nft *realNFTables) SetDefaultTable(table string) {
+	nft.defaultTable = table
 }
 
 // parseElementValue parses a JSON element key/value, handling concatenations, prefixes, and
@@ -517,8 +556,15 @@ func parseElementValue(json interface{}) ([]string, error) {
 }
 
 // ListCounters is part of Interface
-func (nft *realNFTables) ListCounters(ctx context.Context) ([]*Counter, error) {
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "counters", "table", string(nft.family), nft.table)
+func (nft *realNFTables) ListCounters(ctx context.Context, family Family, table string) ([]*Counter, error) {
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = nft.defaultFamily
+	}
+	if table == "" {
+		table = nft.defaultTable
+	}
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "counters", "table", string(family), table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)

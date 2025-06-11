@@ -35,8 +35,8 @@ type Object interface {
 	// validate validates an object for an operation
 	validate(verb verb) error
 
-	// writeOperation writes out an "nft" operation involving the object. It assumes
-	// that the object has been validated.
+	// Writes an "nft" operation for the object. The object is assumed to be validated,
+	// with its table and family inherited from the nftContext if applicable.
 	writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 
 	// parse is the opposite of writeOperation; it fills Object fields based on an "nft add"
@@ -82,6 +82,12 @@ const (
 
 // Table represents an nftables table.
 type Table struct {
+	// Name of the table. if not specified the default table of the context is used instead
+	Name string
+
+	// Family defines the protocol family for this table. If not specified the default family of the context is used instead
+	Family Family
+
 	// Comment is an optional comment for the table. (Requires kernel >= 5.10 and
 	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
 	// nft >= 1.0.8 to include comments in List() results.)
@@ -216,6 +222,12 @@ type Chain struct {
 	// Name is the name of the chain.
 	Name string
 
+	// Table specifies the name of the table this chain belongs to. if not specified the default table of the context is used instead
+	Table string
+
+	// Family defines the protocol family for this chain. If not specified the default family of the context is used instead
+	Family Family
+
 	// Type is the chain type; this must be set for a base chain and unset for a
 	// regular chain.
 	Type *BaseChainType
@@ -249,6 +261,12 @@ type Chain struct {
 type Rule struct {
 	// Chain is the name of the chain that contains this rule
 	Chain string
+
+	// Table specifies the name of the table this rule belongs to. if not specified the default table of the context is used instead
+	Table string
+
+	// Family defines the protocol family for this rule. If not specified the default family of the context is used instead
+	Family Family
 
 	// Rule is the rule in standard nftables syntax. (Should be empty on Delete, but
 	// is ignored if not.) Note that this does not include any rule comment, which is
@@ -309,6 +327,12 @@ type Set struct {
 	// Name is the name of the set.
 	Name string
 
+	// Table specifies the name of the table this set belongs to. if not specified the default table of the context is used instead
+	Table string
+
+	// Family defines the protocol family for this set. If not specified the default family of the context is used instead
+	Family Family
+
 	// Type is the type of the set key (eg "ipv4_addr"). Either Type or TypeOf, but
 	// not both, must be non-empty.
 	Type string
@@ -354,6 +378,12 @@ type Map struct {
 	// Name is the name of the map.
 	Name string
 
+	// Table specifies the name of the table this map belongs to. if not specified the default table of the context is used instead
+	Table string
+
+	// Family defines the protocol family for this map. If not specified the default family of the context is used instead
+	Family Family
+
 	// Type is the type of the map key and value (eg "ipv4_addr : verdict"). Either
 	// Type or TypeOf, but not both, must be non-empty.
 	Type string
@@ -392,6 +422,12 @@ type Map struct {
 
 // Element represents a set or map element
 type Element struct {
+	// Table specifies the name of the table this element belongs to. if not specified the default table of the context is used instead
+	Table string
+
+	// Family defines the protocol family for this element. If not specified the default family of the context is used instead
+	Family Family
+
 	// Set is the name of the set that contains this element (or the empty string if
 	// this is a map element.)
 	Set string
@@ -426,6 +462,12 @@ type Flowtable struct {
 	// Name is the name of the flowtable.
 	Name string
 
+	// Table specifies the name of the table this flowtable belongs to. if not specified the default table of the context is used instead
+	Table string
+
+	// Family defines the protocol family for this flowtable. If not specified the default family of the context is used instead
+	Family Family
+
 	// The Priority can be a signed integer or FlowtableIngressPriority which stands for 0.
 	// Addition and subtraction can be used to set relative priority, e.g. filter + 5 equals to 5.
 	Priority *FlowtableIngressPriority
@@ -443,6 +485,12 @@ type Flowtable struct {
 type Counter struct {
 	// Name is the name of the named counter
 	Name string
+
+	// Table specifies the name of the table this counter belongs to. if not specified the default table of the context is used instead
+	Table string
+
+	// Family defines the protocol family for this counter. If not specified the default family of the context is used instead
+	Family Family
 
 	// Comment is an optional comment for the counter
 	Comment *string

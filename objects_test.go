@@ -911,7 +911,8 @@ func TestObjects(t *testing.T) {
 
 			if err == nil && tc.err == "" {
 				b := &strings.Builder{}
-				ctx := &nftContext{family: IPv4Family, table: "mytable"}
+				ctx := &nftContext{defaultFamily: IPv4Family, defaultTable: "mytable"}
+				adjustTableFamily(ctx, tc.object)
 				tc.object.writeOperation(tc.verb, ctx, b)
 				out := strings.TrimSuffix(b.String(), "\n")
 				if out != tc.out {
@@ -979,7 +980,8 @@ func TestNoObjectComments(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			b := &strings.Builder{}
-			ctx := &nftContext{family: IPv4Family, table: "mytable", noObjectComments: true}
+			ctx := &nftContext{defaultFamily: IPv4Family, defaultTable: "mytable", noObjectComments: true}
+			adjustTableFamily(ctx, tc.object)
 			tc.object.writeOperation(addVerb, ctx, b)
 			out := strings.TrimSuffix(b.String(), "\n")
 			if out != tc.out {

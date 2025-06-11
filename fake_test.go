@@ -31,7 +31,8 @@ import (
 func TestFakeRun(t *testing.T) {
 	fake := NewFake(IPv4Family, "kube-proxy")
 
-	_, err := fake.List(context.Background(), "chains")
+	_, err := fake.List(context.Background(), IPv4Family, "kube-proxy", "chains")
+	mapKey := FamilyTablePair{IPv4Family, "kube-proxy"}
 	if err == nil || !IsNotFound(err) {
 		t.Errorf("expected table not found error but got: %v", err)
 	}
@@ -124,13 +125,13 @@ func TestFakeRun(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	if fake.Table == nil {
-		t.Fatalf("fake.Table is nil")
+	if _, exists := fake.State[mapKey]; !exists {
+		t.Fatalf("fake.State does not contain the expected family-table key")
 	}
 
-	chain := fake.Table.Chains["chain"]
-	if chain == nil || len(fake.Table.Chains) != 2 {
-		t.Fatalf("unexpected contents of table.Chains: %+v", fake.Table.Chains)
+	chain := fake.State[mapKey].Chains["chain"]
+	if chain == nil || len(fake.State[mapKey].Chains) != 2 {
+		t.Fatalf("unexpected contents of table.Chains: %+v", fake.State[mapKey].Chains)
 	}
 
 	if len(chain.Rules) != 2 {
@@ -153,9 +154,9 @@ func TestFakeRun(t *testing.T) {
 	// Save this Rule object for later
 	ruleToDelete := chain.Rules[1]
 
-	m := fake.Table.Maps["map1"]
-	if m == nil || len(fake.Table.Maps) != 1 {
-		t.Fatalf("unexpected contents of table.Maps: %+v", fake.Table.Maps)
+	m := fake.State[mapKey].Maps["map1"]
+	if m == nil || len(fake.State[mapKey].Maps) != 1 {
+		t.Fatalf("unexpected contents of table.Maps: %+v", fake.State[mapKey].Maps)
 	}
 
 	elem := m.FindElement("192.168.0.2", "tcp", "443")
@@ -196,7 +197,7 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("unexpected Dump content:\n%s", diff)
 	}
 
-	chains, err := fake.List(context.Background(), "chains")
+	chains, err := fake.List(context.Background(), IPv4Family, "kube-proxy", "chains")
 	if err != nil {
 		t.Errorf("unexpected error listing chains: %v", err)
 	}
@@ -258,9 +259,9 @@ func TestFakeRun(t *testing.T) {
 	}
 
 	// Neither element should have been added
-	m = fake.Table.Maps["map1"]
-	if m == nil || len(fake.Table.Maps) != 1 {
-		t.Fatalf("unexpected contents of table.Maps: %+v", fake.Table.Maps)
+	m = fake.State[mapKey].Maps["map1"]
+	if m == nil || len(fake.State[mapKey].Maps) != 1 {
+		t.Fatalf("unexpected contents of table.Maps: %+v", fake.State[mapKey].Maps)
 	}
 
 	elem = m.FindElement("192.168.0.3", "tcp", "80")
@@ -274,7 +275,6 @@ func TestFakeRun(t *testing.T) {
 	if len(m.Elements) != 2 {
 		t.Errorf("unexpected contents of map1: %+v", m)
 	}
-
 	// Check delete element from map works
 	tx = fake.NewTransaction()
 	tx.Delete(&Element{
@@ -285,7 +285,7 @@ func TestFakeRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
-	m = fake.Table.Maps["map1"]
+	m = fake.State[mapKey].Maps["map1"]
 	if len(m.Elements) != 1 {
 		t.Errorf("unexpected contents of map1: %+v", m)
 	}
@@ -337,9 +337,97 @@ func TestFakeRun(t *testing.T) {
 	}
 }
 
+func TestHeterogeneousFakeRun(t *testing.T) {
+	fake := NewFake(IPv4Family, "kube-proxy")
+	tx := fake.NewTransaction()
+
+	tx.Add(&Table{})
+	tx.Add(&Chain{Name: "kube-services"})
+	tx.Add(&Rule{Chain: "kube-services", Rule: "ip daddr 10.96.0.1 drop"})
+	tx.Add(&Table{Family: IPv4Family, Name: "my-table"})
+	tx.Add(&Chain{Family: IPv4Family, Table: "my-table", Name: "prerouting"})
+	tx.Add(&Rule{Family: IPv4Family, Table: "my-table", Chain: "prerouting", Rule: "tcp dport 22 accept"})
+	tx.Add(&Table{Family: IPv6Family, Name: "my-table2"})
+	tx.Add(&Chain{Family: IPv6Family, Table: "my-table2", Name: "input"})
+	tx.Add(&Rule{Family: IPv6Family, Table: "my-table2", Chain: "input", Rule: "icmpv6 type echo-request reject"})
+
+	// Run the transaction
+	if err := fake.Run(context.Background(), tx); err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+	if len(fake.State) != 3 {
+		t.Fatalf("expected 3 tables in fake.State, got %d", len(fake.State))
+	}
+
+	// Verify table 1
+	key1 := FamilyTablePair{IPv4Family, "kube-proxy"}
+	table1, exists := fake.State[key1]
+	if !exists {
+		t.Fatal("table ip/kube-proxy not found in fake.State")
+	}
+	if _, exists := table1.Chains["kube-services"]; !exists {
+		t.Error("chain 'KUBE-SERVICES' not found in table ip/kube-proxy")
+	}
+	if len(table1.Chains["kube-services"].Rules) != 1 || table1.Chains["kube-services"].Rules[0].Rule != "ip daddr 10.96.0.1 drop" {
+		t.Errorf("unexpected rule in ip/kube-proxy/kube-services: %+v", table1.Chains["kube-services"].Rules)
+	}
+
+	// Verify table 2
+	key2 := FamilyTablePair{IPv4Family, "my-table"}
+	table2, exists := fake.State[key2]
+	if !exists {
+		t.Fatal("table ip/my-table not found in fake.State")
+	}
+	if _, exists := table2.Chains["prerouting"]; !exists {
+		t.Error("chain 'prerouting' not found in table ip/my-table")
+	}
+	if len(table2.Chains["prerouting"].Rules) != 1 || table2.Chains["prerouting"].Rules[0].Rule != "tcp dport 22 accept" {
+		t.Errorf("unexpected rule in ip/my-table/prerouting: %+v", table2.Chains["prerouting"].Rules)
+	}
+
+	// Verify table 3
+	key3 := FamilyTablePair{IPv6Family, "my-table2"}
+	table3, exists := fake.State[key3]
+	if !exists {
+		t.Fatal("table ip6/my-table2 not found in fake.State")
+	}
+	if _, exists := table3.Chains["input"]; !exists {
+		t.Error("chain 'input' not found in table ip6/my-table2")
+	}
+	if len(table3.Chains["input"].Rules) != 1 || table3.Chains["input"].Rules[0].Rule != "icmpv6 type echo-request reject" {
+		t.Errorf("unexpected rule in ip6/my-table2/input: %+v", table3.Chains["input"].Rules)
+	}
+
+	// Verify the dump contains everything.
+	expected := strings.TrimSpace(dedent.Dedent(`
+		add table ip6 my-table2
+		add chain ip6 my-table2 input
+		add rule ip6 my-table2 input icmpv6 type echo-request reject
+		add table ip kube-proxy
+		add chain ip kube-proxy kube-services
+		add rule ip kube-proxy kube-services ip daddr 10.96.0.1 drop
+		add table ip my-table
+		add chain ip my-table prerouting
+		add rule ip my-table prerouting tcp dport 22 accept
+	`))
+
+	expectedLines := strings.Split(expected, "\n")
+	sort.Strings(expectedLines)
+
+	dumpLines := strings.Split(fake.Dump(), "\n")
+	if dumpLines[len(dumpLines)-1] == "" {
+		dumpLines = dumpLines[:len(dumpLines)-1]
+	}
+	sort.Strings(dumpLines)
+
+	if diff := cmp.Diff(expectedLines, dumpLines); diff != "" {
+		t.Errorf("unexpected Dump content:\n%s", diff)
+	}
+}
+
 func TestFakeCheck(t *testing.T) {
 	fake := NewFake(IPv4Family, "kube-proxy")
-
+	mapKey := FamilyTablePair{IPv4Family, "kube-proxy"}
 	tx := fake.NewTransaction()
 
 	if tx.NumOperations() != 0 {
@@ -392,9 +480,9 @@ func TestFakeCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error from Check: %v", err)
 	}
-	chain := fake.Table.Chains["chain"]
-	if chain == nil || len(fake.Table.Chains) != 1 {
-		t.Fatalf("unexpected contents of table.Chains: %+v", fake.Table.Chains)
+	chain := fake.State[mapKey].Chains["chain"]
+	if chain == nil || len(fake.State[mapKey].Chains) != 1 {
+		t.Fatalf("unexpected contents of table.Chains: %+v", fake.State[mapKey].Chains)
 	}
 
 	// Checking if we can delete an non-existent chain should fail
@@ -408,10 +496,10 @@ func TestFakeCheck(t *testing.T) {
 	}
 }
 
-func assertRules(t *testing.T, fake *Fake, expected ...string) {
+func assertRules(t *testing.T, fake *Fake, family Family, table string, expected ...string) {
 	t.Helper()
 
-	actual, err := fake.ListRules(context.Background(), "test")
+	actual, err := fake.ListRules(context.Background(), family, table, "test")
 	if err != nil {
 		t.Fatalf("could not ListRules: %v", err)
 	}
@@ -450,7 +538,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	_, err = fake.ListRules(context.Background(), "test")
+	_, err = fake.ListRules(context.Background(), IPv4Family, "kube-proxy", "test")
 	if err == nil || !IsNotFound(err) {
 		t.Errorf("expected chain not found but got: %v", err)
 	}
@@ -464,7 +552,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	assertRules(t, fake /* no rules */)
+	assertRules(t, fake, IPv4Family, "kube-proxy" /* no rules */)
 
 	// Test basic Add
 	tx = fake.NewTransaction()
@@ -485,10 +573,10 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	assertRules(t, fake, "first", "second", "third")
+	assertRules(t, fake, IPv4Family, "kube-proxy", "first", "second", "third")
 
 	// (can't fail: we just did this in assertRules)
-	rules, _ := fake.ListRules(context.Background(), "test")
+	rules, _ := fake.ListRules(context.Background(), IPv4Family, "kube-proxy", "test")
 	firstHandle := *rules[0].Handle
 	secondHandle := *rules[1].Handle
 	thirdHandle := *rules[2].Handle
@@ -512,7 +600,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	assertRules(t, fake, "first", "fifth", "second", "fourth", "third")
+	assertRules(t, fake, IPv4Family, "kube-proxy", "first", "fifth", "second", "fourth", "third")
 
 	// Test Insert
 	tx = fake.NewTransaction()
@@ -540,7 +628,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	assertRules(t, fake, "sixth", "first", "fifth", "seventh", "second", "eighth", "fourth", "third")
+	assertRules(t, fake, IPv4Family, "kube-proxy", "sixth", "first", "fifth", "seventh", "second", "eighth", "fourth", "third")
 
 	// Test Replace. And Delete while we're here... the chain is getting kind of long
 	tx = fake.NewTransaction()
@@ -559,11 +647,11 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	assertRules(t, fake, "sixth", "fifth", "seventh", "ninth", "eighth", "fourth", "third")
+	assertRules(t, fake, IPv4Family, "kube-proxy", "sixth", "fifth", "seventh", "ninth", "eighth", "fourth", "third")
 
 	// Re-fetch handles; Replace should not have changed the handle for its rule.
 	// (can't fail: we just did this in assertRules)
-	rules, _ = fake.ListRules(context.Background(), "test")
+	rules, _ = fake.ListRules(context.Background(), IPv4Family, "kube-proxy", "test")
 	if *rules[3].Handle != secondHandle {
 		t.Errorf("Replace changed the rule handle: expected %d got %d", secondHandle, *rules[3].Handle)
 	}
@@ -598,7 +686,7 @@ func TestFakeAddInsertReplace(t *testing.T) {
 		t.Fatalf("unexpected error from Run: %v", err)
 	}
 
-	assertRules(t, fake, "thirteenth", "sixth", "twelfth", "fifth", "seventh", "ninth", "eighth", "fourth", "third", "eleventh", "tenth")
+	assertRules(t, fake, IPv4Family, "kube-proxy", "thirteenth", "sixth", "twelfth", "fifth", "seventh", "ninth", "eighth", "fourth", "third", "eleventh", "tenth")
 }
 
 func TestFakeParseDump(t *testing.T) {

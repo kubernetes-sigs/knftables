@@ -69,12 +69,12 @@ func (table *Table) validate(verb verb) error {
 func (table *Table) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && table.Handle != nil {
-		fmt.Fprintf(writer, "delete table %s handle %d", ctx.family, *table.Handle)
+		fmt.Fprintf(writer, "delete table %s handle %d", table.Family, *table.Handle)
 		return
 	}
 
 	// All other cases refer to the table by name
-	fmt.Fprintf(writer, "%s table %s %s", verb, ctx.family, ctx.table)
+	fmt.Fprintf(writer, "%s table %s %s", verb, table.Family, table.Name)
 	if verb == addVerb || verb == createVerb {
 		hasComment := table.Comment != nil && !ctx.noObjectComments
 		if hasComment || len(table.Flags) != 0 {
@@ -161,11 +161,11 @@ func (chain *Chain) validate(verb verb) error {
 func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && chain.Handle != nil {
-		fmt.Fprintf(writer, "delete chain %s %s handle %d", ctx.family, ctx.table, *chain.Handle)
+		fmt.Fprintf(writer, "delete chain %s %s handle %d", chain.Family, chain.Table, *chain.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s chain %s %s %s", verb, ctx.family, ctx.table, chain.Name)
+	fmt.Fprintf(writer, "%s chain %s %s %s", verb, chain.Family, chain.Table, chain.Name)
 	if verb == addVerb || verb == createVerb {
 		if chain.Type != nil || (chain.Comment != nil && !ctx.noObjectComments) {
 			fmt.Fprintf(writer, " {")
@@ -180,7 +180,7 @@ func (chain *Chain) writeOperation(verb verb, ctx *nftContext, writer io.Writer)
 				// versions of nft don't accept certain named priorities
 				// in all contexts (eg, "dstnat" priority in the "output"
 				// hook).
-				if priority, err := ParsePriority(ctx.family, string(*chain.Priority)); err == nil {
+				if priority, err := ParsePriority(chain.Family, string(*chain.Priority)); err == nil {
 					fmt.Fprintf(writer, " priority %d ;", priority)
 				} else {
 					fmt.Fprintf(writer, " priority %s ;", *chain.Priority)
@@ -264,7 +264,7 @@ func (rule *Rule) validate(verb verb) error {
 }
 
 func (rule *Rule) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
-	fmt.Fprintf(writer, "%s rule %s %s %s", verb, ctx.family, ctx.table, rule.Chain)
+	fmt.Fprintf(writer, "%s rule %s %s %s", verb, rule.Family, rule.Table, rule.Chain)
 	if rule.Index != nil {
 		fmt.Fprintf(writer, " index %d", *rule.Index)
 	} else if rule.Handle != nil {
@@ -334,11 +334,11 @@ func (set *Set) validate(verb verb) error {
 func (set *Set) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && set.Handle != nil {
-		fmt.Fprintf(writer, "delete set %s %s handle %d", ctx.family, ctx.table, *set.Handle)
+		fmt.Fprintf(writer, "delete set %s %s handle %d", set.Family, set.Table, *set.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s set %s %s %s", verb, ctx.family, ctx.table, set.Name)
+	fmt.Fprintf(writer, "%s set %s %s %s", verb, set.Family, set.Table, set.Name)
 	if verb == addVerb || verb == createVerb {
 		fmt.Fprintf(writer, " {")
 
@@ -424,11 +424,11 @@ func (mapObj *Map) validate(verb verb) error {
 func (mapObj *Map) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && mapObj.Handle != nil {
-		fmt.Fprintf(writer, "delete map %s %s handle %d", ctx.family, ctx.table, *mapObj.Handle)
+		fmt.Fprintf(writer, "delete map %s %s handle %d", mapObj.Family, mapObj.Table, *mapObj.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s map %s %s %s", verb, ctx.family, ctx.table, mapObj.Name)
+	fmt.Fprintf(writer, "%s map %s %s %s", verb, mapObj.Family, mapObj.Table, mapObj.Name)
 	if verb == addVerb || verb == createVerb {
 		fmt.Fprintf(writer, " {")
 
@@ -568,7 +568,7 @@ func (element *Element) writeOperation(verb verb, ctx *nftContext, writer io.Wri
 		name = element.Map
 	}
 
-	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, ctx.family, ctx.table, name,
+	fmt.Fprintf(writer, "%s element %s %s %s { %s", verb, element.Family, element.Table, name,
 		strings.Join(element.Key, " . "))
 
 	if verb == addVerb || verb == createVerb {
@@ -639,11 +639,11 @@ func (flowtable *Flowtable) validate(verb verb) error {
 func (flowtable *Flowtable) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && flowtable.Handle != nil {
-		fmt.Fprintf(writer, "delete flowtable %s %s handle %d", ctx.family, ctx.table, *flowtable.Handle)
+		fmt.Fprintf(writer, "delete flowtable %s %s handle %d", flowtable.Family, flowtable.Table, *flowtable.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s flowtable %s %s %s", verb, ctx.family, ctx.table, flowtable.Name)
+	fmt.Fprintf(writer, "%s flowtable %s %s %s", verb, flowtable.Family, flowtable.Table, flowtable.Name)
 	if verb == addVerb || verb == createVerb {
 		fmt.Fprintf(writer, " {")
 
@@ -749,11 +749,11 @@ func (counter *Counter) validate(verb verb) error {
 func (counter *Counter) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	// Special case for delete-by-handle
 	if verb == deleteVerb && counter.Handle != nil {
-		fmt.Fprintf(writer, "delete counter %s %s handle %d", ctx.family, ctx.table, *counter.Handle)
+		fmt.Fprintf(writer, "delete counter %s %s handle %d", counter.Family, counter.Table, *counter.Handle)
 		return
 	}
 
-	fmt.Fprintf(writer, "%s counter %s %s ", verb, ctx.family, ctx.table)
+	fmt.Fprintf(writer, "%s counter %s %s ", verb, counter.Family, counter.Table)
 	switch verb {
 	case addVerb, createVerb:
 		fmt.Fprint(writer, counter.Name)

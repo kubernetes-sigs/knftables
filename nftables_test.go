@@ -36,7 +36,7 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 		},
 		expectedCmd{
 			args:  []string{"/nft", "--check", "-f", "-"},
-			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", family, tableName),
+			stdin: "add table inet knftables-test { comment \"test\" ; }\n",
 		},
 	)
 	nft, err := newInternal(family, tableName, fexec)
@@ -112,7 +112,7 @@ func TestListBad(t *testing.T) {
 					err:    nftErr,
 				},
 			)
-			result, err := nft.List(context.Background(), "chains")
+			result, err := nft.List(context.Background(), IPv6Family, "testing", "chains")
 			if result != nil {
 				t.Errorf("unexpected non-nil result: %v", result)
 			}
@@ -158,7 +158,7 @@ func TestList(t *testing.T) {
 					stdout: tc.nftOutput,
 				},
 			)
-			result, err := nft.List(context.Background(), tc.objType)
+			result, err := nft.List(context.Background(), IPv4Family, "testing", tc.objType)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -201,6 +201,52 @@ func TestRun(t *testing.T) {
 		},
 	)
 
+	err := nft.Run(context.Background(), tx)
+	if err != nil {
+		t.Errorf("unexpected error from Run: %v", err)
+	}
+}
+
+// TestHeterogeneousTransaction tests that a transaction can contain operations for multiple
+// different tables, mixing explicit object properties with the interface's defaults.
+func TestHeterogeneousTransaction(t *testing.T) {
+	nft, fexec, _ := newTestInterface(t, "", "")
+	nft.SetDefaultFamily(InetFamily)
+	nft.SetDefaultTable("default-table")
+
+	tx := nft.NewTransaction()
+
+	// Add some objects with explicit family/table that will override the defaults.
+	tx.Add(&Table{Family: IPv4Family, Name: "ipv4-table"})
+	tx.Flush(&Table{Family: IPv4Family, Name: "ipv4-table"})
+	tx.Add(&Chain{Family: IPv4Family, Table: "ipv4-table", Name: "ipv4-chain"})
+	tx.Add(&Rule{
+		Family: IPv4Family,
+		Table:  "ipv4-table",
+		Chain:  "ipv4-chain",
+		Rule:   "ip daddr 10.0.0.0/8 drop",
+	})
+
+	// Add some objects with empty family/table that will use the defaults.
+	tx.Add(&Table{})
+	tx.Flush(&Table{})
+	tx.Add(&Chain{Name: "default-chain"})
+
+	expected := strings.TrimPrefix(dedent.Dedent(`
+		add table ip ipv4-table
+		flush table ip ipv4-table
+		add chain ip ipv4-table ipv4-chain
+		add rule ip ipv4-table ipv4-chain ip daddr 10.0.0.0/8 drop
+		add table inet default-table
+		flush table inet default-table
+		add chain inet default-table default-chain
+		`), "\n")
+	fexec.expected = append(fexec.expected,
+		expectedCmd{
+			args:  []string{"/nft", "-f", "-"},
+			stdin: expected,
+		},
+	)
 	err := nft.Run(context.Background(), tx)
 	if err != nil {
 		t.Errorf("unexpected error from Run: %v", err)
@@ -285,7 +331,7 @@ func TestListRules(t *testing.T) {
 					},
 				)
 			}
-			result, err := nft.ListRules(context.Background(), tc.chain)
+			result, err := nft.ListRules(context.Background(), IPv4Family, "testing", tc.chain)
 			if err != nil {
 				if tc.nftError == "" {
 					t.Errorf("unexpected error: %v", err)
@@ -449,7 +495,7 @@ func TestListElements(t *testing.T) {
 				},
 			)
 
-			result, err := nft.ListElements(context.Background(), tc.objectType, "test")
+			result, err := nft.ListElements(context.Background(), IPv4Family, "testing", tc.objectType, "test")
 			if err != nil {
 				if tc.nftError == "" {
 					t.Errorf("unexpected error: %v", err)
@@ -497,12 +543,12 @@ func TestFeatures(t *testing.T) {
 				},
 				{
 					args:  []string{"/nft", "--check", "-f", "-"},
-					stdin: "add table ip testing { comment \"test\" ; }\n",
+					stdin: "add table inet knftables-test { comment \"test\" ; }\n",
 				},
 			},
 			result: &nftContext{
-				family: IPv4Family,
-				table:  "testing",
+				defaultFamily: IPv4Family,
+				defaultTable:  "testing",
 			},
 		},
 		{
@@ -516,17 +562,17 @@ func TestFeatures(t *testing.T) {
 				},
 				{
 					args:  []string{"/nft", "--check", "-f", "-"},
-					stdin: "add table ip testing { comment \"test\" ; }\n",
+					stdin: "add table inet knftables-test { comment \"test\" ; }\n",
 					err:   fmt.Errorf("Error: syntax error, unexpected comment"),
 				},
 				{
 					args:  []string{"/nft", "--check", "-f", "-"},
-					stdin: "add table ip testing\n",
+					stdin: "add table inet knftables-test\n",
 				},
 			},
 			result: &nftContext{
-				family: IPv4Family,
-				table:  "testing",
+				defaultFamily: IPv4Family,
+				defaultTable:  "testing",
 
 				noObjectComments: true,
 			},
@@ -597,7 +643,7 @@ func TestListCounters(t *testing.T) {
 				},
 			)
 
-			counters, err := nft.ListCounters(context.Background())
+			counters, err := nft.ListCounters(context.Background(), IPv4Family, "testing")
 			if err != nil {
 				if tc.nftError == "" {
 					t.Errorf("unexpected error: %v", err)

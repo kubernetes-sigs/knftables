@@ -115,3 +115,90 @@ func Concat(args ...interface{}) string {
 	}
 	return b.String()
 }
+
+// adjustTableFamily updates the provided Object to inherit the table and family from the nftContext
+// if they are not already explicitly set on the object.
+func adjustTableFamily(nft *nftContext, obj Object) error {
+	table, family, err := extractTableAndFamily(obj)
+	if err != nil {
+		return err
+	}
+
+	if table == "" || family == "" {
+		if table == "" {
+			table = nft.defaultTable
+		}
+		if family == "" {
+			family = nft.defaultFamily
+		}
+		err = setTableAndFamily(obj, table, family)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func extractTableAndFamily(obj Object) (string, Family, error) {
+	if obj == nil {
+		return "", "", nil
+	}
+
+	switch v := obj.(type) {
+	case *Table:
+		// For a Table object, we need to extract the `Name` field
+		return v.Name, v.Family, nil
+	case *Chain:
+		return v.Table, v.Family, nil
+	case *Rule:
+		return v.Table, v.Family, nil
+	case *Set:
+		return v.Table, v.Family, nil
+	case *Map:
+		return v.Table, v.Family, nil
+	case *Element:
+		return v.Table, v.Family, nil
+	case *Flowtable:
+		return v.Table, v.Family, nil
+	case *Counter:
+		return v.Table, v.Family, nil
+	default:
+		return "", "", fmt.Errorf("type of object not supported")
+	}
+}
+
+func setTableAndFamily(obj Object, table string, family Family) error {
+	if obj == nil {
+		return nil
+	}
+
+	switch v := obj.(type) {
+	case *Table:
+		v.Name = table
+		v.Family = family
+	case *Chain:
+		v.Table = table
+		v.Family = family
+	case *Rule:
+		v.Table = table
+		v.Family = family
+	case *Set:
+		v.Table = table
+		v.Family = family
+	case *Map:
+		v.Table = table
+		v.Family = family
+	case *Element:
+		v.Table = table
+		v.Family = family
+	case *Flowtable:
+		v.Table = table
+		v.Family = family
+	case *Counter:
+		v.Table = table
+		v.Family = family
+	default:
+		return fmt.Errorf("type of object not supported")
+	}
+	return nil
+}

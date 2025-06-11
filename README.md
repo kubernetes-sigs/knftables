@@ -41,21 +41,20 @@ at the table containing that rule_.)
 
 ## Usage
 
-Create an `Interface` object to manage operations on a single nftables
-table:
+Create an `Interface` object to manage nftables operations:
 
 ```golang
-nft, err := knftables.New(knftables.IPv4Family, "my-table")
+nft, err := knftables.New()
 if err != nil {
         return fmt.Errorf("no nftables support: %v", err)
 }
 ```
 
-(If you want to operate on multiple tables or multiple nftables
-families, you will need separate `Interface` objects for each. If you
-need to check whether the system supports an nftables feature as with
-`nft --check`, use `nft.Check()`, which works the same as `nft.Run()`
-below.)
+For Transaction operations, you can set a default family and table that will be used for all objects in the transaction that do not specify one explicitly:
+```golang
+nft.SetDefaultFamily(knftables.IPv4Family)
+nft.SetDefaultTable("my-table")
+```
 
 You can use the `List`, `ListRules`, and `ListElements` methods on the
 `Interface` to check if objects exist. `List` returns the names of
@@ -64,27 +63,34 @@ returns `Element` objects and `ListRules` returns *partial* `Rule`
 objects.
 
 ```golang
-chains, err := nft.List(ctx, "chains")
+chains, err := nft.List(ctx, knftables.InetFamily, "my-table", "my-chain")
 if err != nil {
         return fmt.Errorf("could not list chains: %v", err)
 }
 
-FIXME
+rules, err := nft.ListRules(ctx, knftables.InetFamily, "my-table", "my-chain")
+if err != nil {
+        return fmt.Errorf("could not list rules: %v", err)
+}
 
-elements, err := nft.ListElements(ctx, "map", "mymap")
+elements, err := nft.ListElements(ctx, knftables.InetFamily, "my-table", "map", "mymap")
 if err != nil {
         return fmt.Errorf("could not list map elements: %v", err)
 }
 
-FIXME
 ```
 
 To make changes, create a `Transaction`, add the appropriate
 operations to the transaction, and then call `nft.Run` on it:
 
 ```golang
-tx := nft.NewTransaction()
+nft, err := knftables.New()
+nft.SetDefaultFamily(knftables.IPv4Family)
+nft.SetDefaultTable("my-table")
 
+tx := nft.NewTransaction()
+tx.Add(&knftables.Table{}) // Create default table with default family
+tx.Add(&knftables.Table{name: "my-table2"}) // Create "my-table2" with default family
 tx.Add(&knftables.Chain{
         Name:    "mychain",
         Comment: knftables.PtrTo("this is my chain"),
@@ -92,7 +98,19 @@ tx.Add(&knftables.Chain{
 tx.Flush(&knftables.Chain{
         Name: "mychain",
 })
-
+tx.Add(&knftables.Chain{
+        Name:    "mychain2",
+        Comment: knftables.PtrTo("this is my chain"),
+})
+tx.Flush(&knftables.Chain{
+        Name: "mychain2",
+        Table: "my-table2"
+})
+tx.Add(&Rule{
+        Chain: "chain2",
+        Table: "my-table2"
+        Rule:  "ip daddr 10.0.0.0/8 drop",
+})
 var destIP net.IP
 var destPort uint16
 ...
@@ -115,6 +133,12 @@ use the `knftables.IsNotFound()` and `knftables.IsAlreadyExists()`
 methods to check for those well-known error types. In a large
 transaction, there is no supported way to determine exactly which
 operation failed.
+
+If you want to operate on multiple tables or multiple nftables
+families, you will need separate `Interface` objects for each. If you
+need to check whether the system supports an nftables feature as with
+`nft --check`, use `nft.Check()`, which works the same as `nft.Run()`
+below.
 
 ## `knftables.Transaction` operations
 

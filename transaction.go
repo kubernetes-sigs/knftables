@@ -84,6 +84,9 @@ func (tx *Transaction) operation(verb verb, obj Object) {
 	if tx.err != nil {
 		return
 	}
+	if tx.err = adjustTableFamily(tx.nftContext, obj); tx.err != nil {
+		return
+	}
 	if tx.err = obj.validate(verb); tx.err != nil {
 		return
 	}

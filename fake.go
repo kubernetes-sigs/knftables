@@ -26,6 +26,12 @@ import (
 	"sync"
 )
 
+// Define a struct to be used as the map key.
+type FamilyTablePair struct {
+	family Family
+	table  string
+}
+
 // Fake is a fake implementation of Interface
 type Fake struct {
 	nftContext
@@ -39,7 +45,7 @@ type Fake struct {
 	// Table contains the Interface's table. This will be `nil` until you `tx.Add()`
 	// the table.
 	// Make sure to acquire Fake.RLock before accessing Table in a concurrent environment.
-	Table *FakeTable
+	State map[FamilyTablePair]*FakeTable
 
 	// LastTransaction is the last transaction passed to Run(). It will remain set until the
 	// next time Run() is called. (It is not affected by Check().)
@@ -107,8 +113,8 @@ type FakeMap struct {
 func NewFake(family Family, table string) *Fake {
 	return &Fake{
 		nftContext: nftContext{
-			family: family,
-			table:  table,
+			defaultFamily: family,
+			defaultTable:  table,
 		},
 	}
 }
@@ -116,34 +122,41 @@ func NewFake(family Family, table string) *Fake {
 var _ Interface = &Fake{}
 
 // List is part of Interface.
-func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
+func (fake *Fake) List(_ context.Context, family Family, table string, objectType string) ([]string, error) {
 	fake.RLock()
 	defer fake.RUnlock()
-	if fake.Table == nil {
-		return nil, notFoundError("no such table %q", fake.table)
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = fake.defaultFamily
 	}
-
+	if table == "" {
+		table = fake.defaultTable
+	}
+	fakeTable, exists := fake.State[FamilyTablePair{family, table}]
+	if !exists {
+		return nil, notFoundError("no table %q in family %q", table, family)
+	}
 	var result []string
 
 	switch objectType {
 	case "flowtable", "flowtables":
-		for name := range fake.Table.Flowtables {
+		for name := range fakeTable.Flowtables {
 			result = append(result, name)
 		}
 	case "chain", "chains":
-		for name := range fake.Table.Chains {
+		for name := range fakeTable.Chains {
 			result = append(result, name)
 		}
 	case "set", "sets":
-		for name := range fake.Table.Sets {
+		for name := range fakeTable.Sets {
 			result = append(result, name)
 		}
 	case "map", "maps":
-		for name := range fake.Table.Maps {
+		for name := range fakeTable.Maps {
 			result = append(result, name)
 		}
 	case "counter", "counters":
-		for name := range fake.Table.Counters {
+		for name := range fakeTable.Counters {
 			result = append(result, name)
 		}
 
@@ -155,21 +168,28 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 }
 
 // ListRules is part of Interface
-func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
+func (fake *Fake) ListRules(_ context.Context, family Family, table string, chain string) ([]*Rule, error) {
 	fake.RLock()
 	defer fake.RUnlock()
-	if fake.Table == nil {
-		return nil, notFoundError("no such table %q", fake.table)
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = fake.defaultFamily
 	}
-
+	if table == "" {
+		table = fake.defaultTable
+	}
+	fakeTable, exists := fake.State[FamilyTablePair{family, table}]
+	if !exists {
+		return nil, notFoundError("no table %q in family %q", table, family)
+	}
 	rules := []*Rule{}
 	if chain == "" {
 		// Include all rules across all chains.
-		for _, ch := range fake.Table.Chains {
+		for _, ch := range fakeTable.Chains {
 			rules = append(rules, ch.Rules...)
 		}
 	} else {
-		ch := fake.Table.Chains[chain]
+		ch := fakeTable.Chains[chain]
 		if ch == nil {
 			return nil, notFoundError("no such chain %q", chain)
 		}
@@ -179,19 +199,27 @@ func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
 }
 
 // ListElements is part of Interface
-func (fake *Fake) ListElements(_ context.Context, objectType, name string) ([]*Element, error) {
+func (fake *Fake) ListElements(_ context.Context, family Family, table string, objectType, name string) ([]*Element, error) {
 	fake.RLock()
 	defer fake.RUnlock()
-	if fake.Table == nil {
-		return nil, notFoundError("no such %s %q", objectType, name)
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = fake.defaultFamily
+	}
+	if table == "" {
+		table = fake.defaultTable
+	}
+	fakeTable, exists := fake.State[FamilyTablePair{family, table}]
+	if !exists {
+		return nil, notFoundError("no table %q in family %q", table, family)
 	}
 	if objectType == "set" {
-		s := fake.Table.Sets[name]
+		s := fakeTable.Sets[name]
 		if s != nil {
 			return s.Elements, nil
 		}
 	} else if objectType == "map" {
-		m := fake.Table.Maps[name]
+		m := fakeTable.Maps[name]
 		if m != nil {
 			return m.Elements, nil
 		}
@@ -209,9 +237,9 @@ func (fake *Fake) Run(_ context.Context, tx *Transaction) error {
 	fake.Lock()
 	defer fake.Unlock()
 	fake.LastTransaction = tx
-	updatedTable, err := fake.run(tx)
+	updatedState, err := fake.run(tx)
 	if err == nil {
-		fake.Table = updatedTable
+		fake.State = updatedState
 	}
 	return err
 }
@@ -225,17 +253,33 @@ func (fake *Fake) Check(_ context.Context, tx *Transaction) error {
 }
 
 // must be called with fake.lock held
-func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
+func (fake *Fake) run(tx *Transaction) (map[FamilyTablePair]*FakeTable, error) {
 	if tx.err != nil {
 		return nil, tx.err
 	}
 
-	updatedTable := fake.Table.copy()
+	// Deep copy the map
+	updatedState := make(map[FamilyTablePair]*FakeTable, len(fake.State))
+
+	for key, value := range fake.State {
+		newPair := FamilyTablePair{
+			family: key.family,
+			table:  key.table,
+		}
+		updatedState[newPair] = value.copy()
+	}
+
 	for _, op := range tx.operations {
+		table, family, err := extractTableAndFamily(op.obj)
+		if err != nil {
+			return nil, err
+		}
+		mapKey := FamilyTablePair{family, table}
 		// If the table hasn't been created, and this isn't a Table operation, then fail
-		if updatedTable == nil {
+		_, exists := updatedState[mapKey]
+		if !exists {
 			if _, ok := op.obj.(*Table); !ok {
-				return nil, notFoundError("no such table \"%s %s\"", fake.family, fake.table)
+				return nil, notFoundError("no such table \"%s %s\"", family, table)
 			}
 		}
 
@@ -245,22 +289,26 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 
 		switch obj := op.obj.(type) {
 		case *Table:
-			err := checkExists(op.verb, "table", fake.table, updatedTable != nil)
+			err := checkExists(op.verb, "table", table, exists)
 			if err != nil {
 				return nil, err
 			}
 			switch op.verb {
 			case flushVerb:
-				updatedTable = nil
+				updatedState[mapKey].Flowtables = make(map[string]*FakeFlowtable)
+				updatedState[mapKey].Chains = make(map[string]*FakeChain)
+				updatedState[mapKey].Sets = make(map[string]*FakeSet)
+				updatedState[mapKey].Maps = make(map[string]*FakeMap)
+				updatedState[mapKey].Counters = make(map[string]*FakeCounter)
 				fallthrough
 			case addVerb, createVerb:
-				if updatedTable != nil {
+				if exists {
 					continue
 				}
-				table := *obj
-				table.Handle = PtrTo(fake.nextHandle)
-				updatedTable = &FakeTable{
-					Table:      table,
+				tableObj := *obj
+				tableObj.Handle = PtrTo(fake.nextHandle)
+				updatedState[mapKey] = &FakeTable{
+					Table:      tableObj,
 					Flowtables: make(map[string]*FakeFlowtable),
 					Chains:     make(map[string]*FakeChain),
 					Sets:       make(map[string]*FakeSet),
@@ -268,13 +316,13 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 					Counters:   make(map[string]*FakeCounter),
 				}
 			case deleteVerb:
-				updatedTable = nil
+				delete(updatedState, mapKey)
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
 
 		case *Flowtable:
-			existingFlowtable := updatedTable.Flowtables[obj.Name]
+			existingFlowtable := updatedState[mapKey].Flowtables[obj.Name]
 			err := checkExists(op.verb, "flowtable", obj.Name, existingFlowtable != nil)
 			if err != nil {
 				return nil, err
@@ -286,18 +334,18 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				}
 				flowtable := *obj
 				flowtable.Handle = PtrTo(fake.nextHandle)
-				updatedTable.Flowtables[obj.Name] = &FakeFlowtable{
+				updatedState[mapKey].Flowtables[obj.Name] = &FakeFlowtable{
 					Flowtable: flowtable,
 				}
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(updatedTable.Flowtables, obj.Name)
+				delete(updatedState[mapKey].Flowtables, obj.Name)
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
 
 		case *Chain:
-			existingChain := updatedTable.Chains[obj.Name]
+			existingChain := updatedState[mapKey].Chains[obj.Name]
 			err := checkExists(op.verb, "chain", obj.Name, existingChain != nil)
 			if err != nil {
 				return nil, err
@@ -309,20 +357,20 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				}
 				chain := *obj
 				chain.Handle = PtrTo(fake.nextHandle)
-				updatedTable.Chains[obj.Name] = &FakeChain{
+				updatedState[mapKey].Chains[obj.Name] = &FakeChain{
 					Chain: chain,
 				}
 			case flushVerb:
 				existingChain.Rules = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(updatedTable.Chains, obj.Name)
+				delete(updatedState[mapKey].Chains, obj.Name)
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
 
 		case *Rule:
-			existingChain := updatedTable.Chains[obj.Chain]
+			existingChain := updatedState[mapKey].Chains[obj.Chain]
 			if existingChain == nil {
 				return nil, notFoundError("no such chain %q", obj.Chain)
 			}
@@ -349,7 +397,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				refRule = *obj.Index
 			}
 
-			if err := checkRuleRefs(obj, updatedTable); err != nil {
+			if err := checkRuleRefs(obj, updatedState[mapKey]); err != nil {
 				return nil, err
 			}
 
@@ -375,7 +423,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 			}
 
 		case *Set:
-			existingSet := updatedTable.Sets[obj.Name]
+			existingSet := updatedState[mapKey].Sets[obj.Name]
 			err := checkExists(op.verb, "set", obj.Name, existingSet != nil)
 			if err != nil {
 				return nil, err
@@ -387,19 +435,19 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				}
 				set := *obj
 				set.Handle = PtrTo(fake.nextHandle)
-				updatedTable.Sets[obj.Name] = &FakeSet{
+				updatedState[mapKey].Sets[obj.Name] = &FakeSet{
 					Set: set,
 				}
 			case flushVerb:
 				existingSet.Elements = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(updatedTable.Sets, obj.Name)
+				delete(updatedState[mapKey].Sets, obj.Name)
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Map:
-			existingMap := updatedTable.Maps[obj.Name]
+			existingMap := updatedState[mapKey].Maps[obj.Name]
 			err := checkExists(op.verb, "map", obj.Name, existingMap != nil)
 			if err != nil {
 				return nil, err
@@ -411,20 +459,20 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				}
 				mapObj := *obj
 				mapObj.Handle = PtrTo(fake.nextHandle)
-				updatedTable.Maps[obj.Name] = &FakeMap{
+				updatedState[mapKey].Maps[obj.Name] = &FakeMap{
 					Map: mapObj,
 				}
 			case flushVerb:
 				existingMap.Elements = nil
 			case deleteVerb:
 				// FIXME delete-by-handle
-				delete(updatedTable.Maps, obj.Name)
+				delete(updatedState[mapKey].Maps, obj.Name)
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Element:
 			if obj.Set != "" {
-				existingSet := updatedTable.Sets[obj.Set]
+				existingSet := updatedState[mapKey].Sets[obj.Set]
 				if existingSet == nil {
 					return nil, notFoundError("no such set %q", obj.Set)
 				}
@@ -450,11 +498,11 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 					return nil, fmt.Errorf("unhandled operation %q", op.verb)
 				}
 			} else {
-				existingMap := updatedTable.Maps[obj.Map]
+				existingMap := updatedState[mapKey].Maps[obj.Map]
 				if existingMap == nil {
 					return nil, notFoundError("no such map %q", obj.Map)
 				}
-				if err := checkElementRefs(obj, updatedTable); err != nil {
+				if err := checkElementRefs(obj, updatedState[mapKey]); err != nil {
 					return nil, err
 				}
 				switch op.verb {
@@ -480,7 +528,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				}
 			}
 		case *Counter:
-			existingCounter := updatedTable.Counters[obj.Name]
+			existingCounter := updatedState[mapKey].Counters[obj.Name]
 			switch op.verb {
 			case addVerb, createVerb:
 				err := checkExists(op.verb, "counter", obj.Name, existingCounter != nil)
@@ -491,21 +539,21 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 					continue
 				}
 				obj.Handle = PtrTo(fake.nextHandle)
-				updatedTable.Counters[obj.Name] = &FakeCounter{*obj}
+				updatedState[mapKey].Counters[obj.Name] = &FakeCounter{*obj}
 			case resetVerb:
 				err := checkExists(op.verb, "counter", obj.Name, existingCounter != nil)
 				if err != nil {
 					return nil, err
 				}
-				updatedTable.Counters[obj.Name].Packets = PtrTo[uint64](0)
-				updatedTable.Counters[obj.Name].Bytes = PtrTo[uint64](0)
+				updatedState[mapKey].Counters[obj.Name].Packets = PtrTo[uint64](0)
+				updatedState[mapKey].Counters[obj.Name].Bytes = PtrTo[uint64](0)
 			case deleteVerb:
 				if obj.Handle != nil {
 					var found bool
-					for _, counter := range updatedTable.Counters {
+					for _, counter := range updatedState[FamilyTablePair{family, table}].Counters {
 						if *counter.Handle == *obj.Handle {
 							found = true
-							delete(updatedTable.Counters, counter.Name)
+							delete(updatedState[mapKey].Counters, counter.Name)
 							break
 						}
 					}
@@ -517,7 +565,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 					if err != nil {
 						return nil, err
 					}
-					delete(updatedTable.Counters, obj.Name)
+					delete(updatedState[mapKey].Counters, obj.Name)
 				}
 			default:
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
@@ -526,8 +574,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 			return nil, fmt.Errorf("unhandled object type %T", op.obj)
 		}
 	}
-
-	return updatedTable, nil
+	return updatedState, nil
 }
 
 func checkExists(verb verb, objectType, name string, exists bool) error {
@@ -538,6 +585,10 @@ func checkExists(verb verb, objectType, name string, exists bool) error {
 	case createVerb:
 		if exists {
 			return existsError("%s %q already exists", objectType, name)
+		}
+	case flushVerb:
+		if !exists && objectType == "table" {
+			return notFoundError("no such %s %q", objectType, name)
 		}
 	default:
 		if !exists {
@@ -596,72 +647,72 @@ func checkElementRefs(element *Element, table *FakeTable) error {
 func (fake *Fake) Dump() string {
 	fake.RLock()
 	defer fake.RUnlock()
-	if fake.Table == nil {
+	if len(fake.State) == 0 {
 		return ""
 	}
 
 	buf := &strings.Builder{}
 
-	table := fake.Table
-	flowtables := sortKeys(table.Flowtables)
-	chains := sortKeys(table.Chains)
-	sets := sortKeys(table.Sets)
-	maps := sortKeys(table.Maps)
-	counters := sortKeys(table.Counters)
+	for _, table := range fake.State {
+		flowtables := sortKeys(table.Flowtables)
+		chains := sortKeys(table.Chains)
+		sets := sortKeys(table.Sets)
+		maps := sortKeys(table.Maps)
+		counters := sortKeys(table.Counters)
 
-	// Write out all of the object adds first.
+		// Write out all of the object adds first.
 
-	table.writeOperation(addVerb, &fake.nftContext, buf)
-	for _, fname := range flowtables {
-		ft := table.Flowtables[fname]
-		ft.writeOperation(addVerb, &fake.nftContext, buf)
-	}
-	for _, cname := range chains {
-		ch := table.Chains[cname]
-		ch.writeOperation(addVerb, &fake.nftContext, buf)
-	}
-	for _, sname := range sets {
-		s := table.Sets[sname]
-		s.writeOperation(addVerb, &fake.nftContext, buf)
-	}
-	for _, mname := range maps {
-		m := table.Maps[mname]
-		m.writeOperation(addVerb, &fake.nftContext, buf)
-	}
-	for _, cname := range counters {
-		m := table.Counters[cname]
-		m.writeOperation(addVerb, &fake.nftContext, buf)
-	}
-	// Now write their contents.
+		table.writeOperation(addVerb, &fake.nftContext, buf)
+		for _, fname := range flowtables {
+			ft := table.Flowtables[fname]
+			ft.writeOperation(addVerb, &fake.nftContext, buf)
+		}
+		for _, cname := range chains {
+			ch := table.Chains[cname]
+			ch.writeOperation(addVerb, &fake.nftContext, buf)
+		}
+		for _, sname := range sets {
+			s := table.Sets[sname]
+			s.writeOperation(addVerb, &fake.nftContext, buf)
+		}
+		for _, mname := range maps {
+			m := table.Maps[mname]
+			m.writeOperation(addVerb, &fake.nftContext, buf)
+		}
+		for _, cname := range counters {
+			m := table.Counters[cname]
+			m.writeOperation(addVerb, &fake.nftContext, buf)
+		}
+		// Now write their contents.
 
-	for _, cname := range chains {
-		ch := table.Chains[cname]
-		for _, rule := range ch.Rules {
-			// Avoid outputing handles
-			dumpRule := *rule
-			dumpRule.Handle = nil
-			dumpRule.Index = nil
-			dumpRule.writeOperation(addVerb, &fake.nftContext, buf)
+		for _, cname := range chains {
+			ch := table.Chains[cname]
+			for _, rule := range ch.Rules {
+				// Avoid outputing handles
+				dumpRule := *rule
+				dumpRule.Handle = nil
+				dumpRule.Index = nil
+				dumpRule.writeOperation(addVerb, &fake.nftContext, buf)
+			}
+		}
+		for _, sname := range sets {
+			s := table.Sets[sname]
+			for _, element := range s.Elements {
+				element.writeOperation(addVerb, &fake.nftContext, buf)
+			}
+		}
+		for _, mname := range maps {
+			m := table.Maps[mname]
+			for _, element := range m.Elements {
+				element.writeOperation(addVerb, &fake.nftContext, buf)
+			}
 		}
 	}
-	for _, sname := range sets {
-		s := table.Sets[sname]
-		for _, element := range s.Elements {
-			element.writeOperation(addVerb, &fake.nftContext, buf)
-		}
-	}
-	for _, mname := range maps {
-		m := table.Maps[mname]
-		for _, element := range m.Elements {
-			element.writeOperation(addVerb, &fake.nftContext, buf)
-		}
-	}
-
 	return buf.String()
 }
 
 // ParseDump can parse a dump for a given nft instance.
-// It expects fake's table name and family in all rules.
+// It can handle dumps containing multiple tables and address families.
 // The best way to verify that everything important was properly parsed is to
 // compare given data with nft.Dump() output.
 func (fake *Fake) ParseDump(data string) (err error) {
@@ -671,44 +722,50 @@ func (fake *Fake) ParseDump(data string) (err error) {
 	parsingDone := false
 	defer func() {
 		if err != nil && !parsingDone {
-			err = fmt.Errorf("%w (at line %v: %s", err, i+1, line)
+			err = fmt.Errorf("%w (at line %d: %s)", err, i+1, line)
 		}
 	}()
+
 	tx := fake.NewTransaction()
-	commonRegexp := regexp.MustCompile(fmt.Sprintf(`add ([^ ]*) %s %s( (.*))?`, fake.family, fake.table))
+	// Regex to capture: 1:object type, 2:family, 3:table, 4:the rest of the line
+	commonRegexp := regexp.MustCompile(`^add ([^ ]+) ([^ ]+) ([^ ]+)(?: (.*))?$`)
 
 	for i, line = range lines {
 		line = strings.TrimSpace(line)
-		if line == "" || line[0] == '#' {
+		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 		match := commonRegexp.FindStringSubmatch(line)
 		if match == nil {
-			return fmt.Errorf("could not parse, or wrong table/family")
+			return fmt.Errorf("could not parse line, expected 'add <type> <family> <table> ...'")
 		}
+
+		objectType := match[1]
+		family := Family(match[2])
+		table := match[3]
+		details := strings.TrimSpace(match[4])
 		var obj Object
-		switch match[1] {
+		switch objectType {
 		case "table":
-			obj = &Table{}
+			obj = &Table{Family: family, Name: table}
 		case "flowtable":
-			obj = &Flowtable{}
+			obj = &Flowtable{Family: family, Table: table}
 		case "chain":
-			obj = &Chain{}
+			obj = &Chain{Family: family, Table: table}
 		case "rule":
-			obj = &Rule{}
+			obj = &Rule{Family: family, Table: table}
 		case "map":
-			obj = &Map{}
+			obj = &Map{Family: family, Table: table}
 		case "set":
-			obj = &Set{}
+			obj = &Set{Family: family, Table: table}
 		case "element":
-			obj = &Element{}
+			obj = &Element{Family: family, Table: table}
 		case "counter":
-			obj = &Counter{}
+			obj = &Counter{Family: family, Table: table}
 		default:
-			return fmt.Errorf("unknown object %s", match[1])
+			return fmt.Errorf("unknown object type %q", objectType)
 		}
-		err = obj.parse(match[3])
-		if err != nil {
+		if err = obj.parse(details); err != nil {
 			return err
 		}
 		tx.Add(obj)
@@ -809,10 +866,33 @@ func (m *FakeMap) FindElement(key ...string) *Element {
 }
 
 // ListCounters is part of Interface
-func (fake *Fake) ListCounters(_ context.Context) ([]*Counter, error) {
-	counters := make([]*Counter, len(fake.Table.Counters))
-	for _, fakeCounter := range fake.Table.Counters {
+func (fake *Fake) ListCounters(_ context.Context, family Family, table string) ([]*Counter, error) {
+	fake.RLock()
+	defer fake.RUnlock()
+	// If family or table are not specified, use the defaults.
+	if family == "" {
+		family = fake.defaultFamily
+	}
+	if table == "" {
+		table = fake.defaultTable
+	}
+	fakeTable, exists := fake.State[FamilyTablePair{family, table}]
+	if !exists {
+		return nil, notFoundError("no table %q in family %q", table, family)
+	}
+	counters := make([]*Counter, len(fakeTable.Counters))
+	for _, fakeCounter := range fakeTable.Counters {
 		counters = append(counters, PtrTo(fakeCounter.Counter))
 	}
 	return counters, nil
+}
+
+// SetDefaultFamily is part of Interface
+func (fake *Fake) SetDefaultFamily(family Family) {
+	fake.nftContext.defaultFamily = family
+}
+
+// SetDefaultTable is part of Interface
+func (fake *Fake) SetDefaultTable(table string) {
+	fake.nftContext.defaultTable = table
 }
