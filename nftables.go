@@ -88,6 +88,10 @@ type realNFTables struct {
 func newInternal(family Family, table string, execer execer) (Interface, error) {
 	var err error
 
+	if (family == "") != (table == "") {
+		return nil, fmt.Errorf("family and table must either both be specified or both be empty")
+	}
+
 	nft := &realNFTables{
 		nftContext: nftContext{
 			family: family,
@@ -111,16 +115,30 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 		return nil, fmt.Errorf("nft version must be v1.0.1 or later (got %s)", strings.TrimSpace(out))
 	}
 
+	testFamily := family
+	if testFamily == "" {
+		testFamily = InetFamily
+	}
+	testTable := table
+	if testTable == "" {
+		testTable = "test"
+	}
+
 	// Check that (a) nft works, (b) we have permission, (c) the kernel is new enough
 	// to support object comments.
 	tx := nft.NewTransaction()
 	tx.Add(&Table{
+		Family:  testFamily,
+		Name:    testTable,
 		Comment: PtrTo("test"),
 	})
 	if err := nft.Check(context.TODO(), tx); err != nil {
 		// Try again, checking just that (a) nft works, (b) we have permission.
 		tx := nft.NewTransaction()
-		tx.Add(&Table{})
+		tx.Add(&Table{
+			Family: testFamily,
+			Name:   testTable,
+		})
 		if err := nft.Check(context.TODO(), tx); err != nil {
 			return nil, fmt.Errorf("could not run nftables command: %w", err)
 		}
@@ -131,8 +149,13 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 	return nft, nil
 }
 
-// New creates a new nftables.Interface for interacting with the given table. If nftables
-// is not available/usable on the current host, it will return an error.
+// New creates a new nftables.Interface. If nftables is not available/usable on the
+// current host, it will return an error.
+//
+// Normally, family and table will specify the family and table to use for all operations
+// on the returned Interface. However, if you leave them empty (`""`), then the Interface
+// will have no associated family/table and (a) you must explicitly fill in those fields
+// in any objects you use in a Transaction, (b) you can't use any of the List* methods.
 func New(family Family, table string) (Interface, error) {
 	return newInternal(family, table, realExec{})
 }

@@ -29,6 +29,15 @@ import (
 
 func newTestInterface(t *testing.T, family Family, tableName string) (Interface, *fakeExec, error) {
 	fexec := newFakeExec(t)
+	testFamily := family
+	if testFamily == "" {
+		testFamily = InetFamily
+	}
+	testTable := tableName
+	if testTable == "" {
+		testTable = "test"
+	}
+
 	fexec.expected = append(fexec.expected,
 		expectedCmd{
 			args:   []string{"/nft", "--version"},
@@ -36,7 +45,7 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 		},
 		expectedCmd{
 			args:  []string{"/nft", "--check", "-f", "-"},
-			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", family, tableName),
+			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", testFamily, testTable),
 		},
 	)
 	nft, err := newInternal(family, tableName, fexec)
@@ -613,5 +622,101 @@ func TestListCounters(t *testing.T) {
 				t.Errorf("unexpected result:\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestMultiTable(t *testing.T) {
+	nft, fexec, _ := newTestInterface(t, "", "")
+
+	tx := nft.NewTransaction()
+
+	tx.Add(&Table{
+		Family: IPv4Family,
+		Name:   "test1",
+	})
+	tx.Add(&Chain{
+		Family: IPv4Family,
+		Table:  "test1",
+		Name:   "foo",
+	})
+	tx.Add(&Rule{
+		Family: IPv4Family,
+		Table:  "test1",
+		Chain:  "foo",
+		Rule:   "ip daddr 10.0.0.0/8 drop",
+	})
+	tx.Add(&Table{
+		Family: IPv4Family,
+		Name:   "test2",
+	})
+	tx.Add(&Chain{
+		Family: IPv4Family,
+		Table:  "test2",
+		Name:   "foo",
+	})
+	tx.Add(&Rule{
+		Family: IPv4Family,
+		Table:  "test2",
+		Chain:  "foo",
+		Rule:   "ip daddr 192.168.0.0/24 accept",
+	})
+
+	tx.Add(&Table{
+		Family: IPv6Family,
+		Name:   "test1",
+	})
+	tx.Add(&Chain{
+		Family: IPv6Family,
+		Table:  "test1",
+		Name:   "foo",
+	})
+	tx.Add(&Rule{
+		Family: IPv6Family,
+		Table:  "test1",
+		Chain:  "foo",
+		Rule:   "ip daddr ::1 drop",
+	})
+
+	expected := strings.TrimPrefix(dedent.Dedent(`
+		add table ip test1
+		add chain ip test1 foo
+		add rule ip test1 foo ip daddr 10.0.0.0/8 drop
+		add table ip test2
+		add chain ip test2 foo
+		add rule ip test2 foo ip daddr 192.168.0.0/24 accept
+		add table ip6 test1
+		add chain ip6 test1 foo
+		add rule ip6 test1 foo ip daddr ::1 drop
+		`), "\n")
+	fexec.expected = append(fexec.expected,
+		expectedCmd{
+			args:  []string{"/nft", "-f", "-"},
+			stdin: expected,
+		},
+	)
+
+	err := nft.Run(context.Background(), tx)
+	if err != nil {
+		t.Errorf("unexpected error from Run: %v", err)
+	}
+
+	// You can't let Family and Name be defaulted if there is no default
+	tx = nft.NewTransaction()
+	tx.Add(&Table{})
+	err = nft.Run(context.Background(), tx)
+	if err == nil {
+		t.Errorf("expected an error trying to add an object with no explicit Family/Table")
+	}
+
+	// But you can't explicitly specify a different family/table when there's a default
+	nft, _, _ = newTestInterface(t, IPv4Family, "test")
+	tx = nft.NewTransaction()
+	tx.Add(&Table{
+		Family: IPv4Family,
+		Name:   "different",
+	})
+	err = nft.Run(context.Background(), tx)
+	if err == nil {
+		t.Errorf("expected an error trying to add an object with wrong Family/Table")
 	}
 }

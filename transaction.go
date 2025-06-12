@@ -84,7 +84,7 @@ func (tx *Transaction) operation(verb verb, obj Object) {
 	if tx.err != nil {
 		return
 	}
-	if tx.err = obj.validate(verb); tx.err != nil {
+	if tx.err = obj.validate(verb, tx.nftContext); tx.err != nil {
 		return
 	}
 

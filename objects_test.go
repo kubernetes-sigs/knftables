@@ -892,7 +892,8 @@ func TestObjects(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.object.validate(tc.verb)
+			ctx := &nftContext{family: IPv4Family, table: "mytable"}
+			err := tc.object.validate(tc.verb, ctx)
 			if err == nil {
 				if tc.err != "" {
 					t.Errorf("expected error with %q but got none", tc.err)
@@ -911,7 +912,6 @@ func TestObjects(t *testing.T) {
 
 			if err == nil && tc.err == "" {
 				b := &strings.Builder{}
-				ctx := &nftContext{family: IPv4Family, table: "mytable"}
 				tc.object.writeOperation(tc.verb, ctx, b)
 				out := strings.TrimSuffix(b.String(), "\n")
 				if out != tc.out {
