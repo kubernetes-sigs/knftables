@@ -136,11 +136,13 @@ func parseTableFlags(s string) []TableFlag {
 	return res
 }
 
-func (table *Table) parse(line string) error {
+func (table *Table) parse(family Family, tableName, line string) error {
 	match := tableRegexp.FindStringSubmatch(line)
 	if match == nil {
 		return fmt.Errorf("failed parsing table add command")
 	}
+	table.Family = family
+	table.Name = tableName
 	table.Comment = getComment(match[1])
 	if match[2] != "" {
 		table.Flags = parseTableFlags(match[2])
@@ -237,11 +239,13 @@ var chainRegexp = regexp.MustCompile(fmt.Sprintf(
 	`%s(?: {(?: type %s hook %s(?: device "%s")?(?: priority %s ;)(?: policy %s ;)?)?(?: comment %s ;)? })?`,
 	noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, noSpaceGroup, commentGroup))
 
-func (chain *Chain) parse(line string) error {
+func (chain *Chain) parse(family Family, table, line string) error {
 	match := chainRegexp.FindStringSubmatch(line)
 	if match == nil {
 		return fmt.Errorf("failed parsing chain add command")
 	}
+	chain.Family = family
+	chain.Table = table
 	chain.Name = match[1]
 	chain.Comment = getComment(match[7])
 	if match[2] != "" {
@@ -325,11 +329,13 @@ var ruleRegexp = regexp.MustCompile(fmt.Sprintf(
 	`%s(?: index %s)?(?: handle %s)? ([^"]*)(?: comment %s)?$`,
 	noSpaceGroup, numberGroup, numberGroup, commentGroup))
 
-func (rule *Rule) parse(line string) error {
+func (rule *Rule) parse(family Family, table, line string) error {
 	match := ruleRegexp.FindStringSubmatch(line)
 	if match == nil {
 		return fmt.Errorf("failed parsing rule add command")
 	}
+	rule.Family = family
+	rule.Table = table
 	rule.Chain = match[1]
 	rule.Rule = match[4]
 	rule.Comment = getComment(match[5])
@@ -427,11 +433,13 @@ func (set *Set) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	fmt.Fprintf(writer, "\n")
 }
 
-func (set *Set) parse(line string) error {
+func (set *Set) parse(family Family, table, line string) error {
 	match := setRegexp.FindStringSubmatch(line)
 	if match == nil {
 		return fmt.Errorf("failed parsing set add command")
 	}
+	set.Family = family
+	set.Table = table
 	set.Name, set.Type, set.TypeOf, set.Flags, set.Timeout, set.GCInterval,
 		set.Size, set.Policy, set.Comment, set.AutoMerge = parseMapAndSetProps(match)
 	return nil
@@ -519,11 +527,13 @@ func (mapObj *Map) writeOperation(verb verb, ctx *nftContext, writer io.Writer) 
 	fmt.Fprintf(writer, "\n")
 }
 
-func (mapObj *Map) parse(line string) error {
+func (mapObj *Map) parse(family Family, table, line string) error {
 	match := mapRegexp.FindStringSubmatch(line)
 	if match == nil {
 		return fmt.Errorf("failed parsing map add command")
 	}
+	mapObj.Family = family
+	mapObj.Table = table
 	mapObj.Name, mapObj.Type, mapObj.TypeOf, mapObj.Flags, mapObj.Timeout, mapObj.GCInterval,
 		mapObj.Size, mapObj.Policy, mapObj.Comment, _ = parseMapAndSetProps(match)
 	return nil
@@ -644,7 +654,7 @@ var mapElementRegexp = regexp.MustCompile(fmt.Sprintf(
 var setElementRegexp = regexp.MustCompile(fmt.Sprintf(
 	`%s { ([^"]*)(?: comment %s)? }`, noSpaceGroup, commentGroup))
 
-func (element *Element) parse(line string) error {
+func (element *Element) parse(family Family, table, line string) error {
 	// try to match map element first, since it has more groups, and if it matches, then we can be sure
 	// this is map element.
 	match := mapElementRegexp.FindStringSubmatch(line)
@@ -654,6 +664,8 @@ func (element *Element) parse(line string) error {
 			return fmt.Errorf("failed parsing element add command")
 		}
 	}
+	element.Family = family
+	element.Table = table
 	element.Comment = getComment(match[3])
 	mapOrSetName := match[1]
 	element.Key = append(element.Key, strings.Split(match[2], " . ")...)
@@ -725,11 +737,13 @@ var flowtableRegexp = regexp.MustCompile(fmt.Sprintf(
 	`%s(?: {(?: hook ingress priority %s ;)(?: devices = {(.*)} ;) })?`,
 	noSpaceGroup, noSpaceGroup))
 
-func (flowtable *Flowtable) parse(line string) error {
+func (flowtable *Flowtable) parse(family Family, table, line string) error {
 	match := flowtableRegexp.FindStringSubmatch(line)
 	if match == nil {
 		return fmt.Errorf("failed parsing flowtableRegexp add command")
 	}
+	flowtable.Family = family
+	flowtable.Table = table
 	flowtable.Name = match[1]
 	if match[2] != "" {
 		flowtable.Priority = (*FlowtableIngressPriority)(&match[2])
@@ -755,11 +769,13 @@ var counterRegexp = regexp.MustCompile(fmt.Sprintf(
 	`%s(?: {(?: packets %s bytes %s ;)?(?: comment %s ;)? })?`,
 	noSpaceGroup, numberGroup, numberGroup, commentGroup))
 
-func (counter *Counter) parse(line string) error {
+func (counter *Counter) parse(family Family, table, line string) error {
 	match := counterRegexp.FindStringSubmatch(line)
 	if match == nil {
 		return fmt.Errorf("failed parsing table add command")
 	}
+	counter.Family = family
+	counter.Table = table
 	counter.Name = match[1]
 	if match[2] != "" {
 		counter.Packets = PtrTo(uint64(*parseInt(match[2])))

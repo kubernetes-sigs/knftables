@@ -727,6 +727,8 @@ func (fake *Fake) dumpTable(buf *strings.Builder, table *FakeTable) {
 	}
 }
 
+var commonRegexp = regexp.MustCompile(`add ([^ ]*) ([^ ]*) ([^ ]*)( (.*))?`)
+
 // ParseDump can parse a dump for a given nft instance.
 // It expects fake's table name and family in all rules.
 // The best way to verify that everything important was properly parsed is to
@@ -742,7 +744,6 @@ func (fake *Fake) ParseDump(data string) (err error) {
 		}
 	}()
 	tx := fake.NewTransaction()
-	commonRegexp := regexp.MustCompile(fmt.Sprintf(`add ([^ ]*) %s %s( (.*))?`, fake.family, fake.table))
 
 	for i, line = range lines {
 		line = strings.TrimSpace(line)
@@ -751,8 +752,27 @@ func (fake *Fake) ParseDump(data string) (err error) {
 		}
 		match := commonRegexp.FindStringSubmatch(line)
 		if match == nil {
-			return fmt.Errorf("could not parse, or wrong table/family")
+			return fmt.Errorf("could not parse")
 		}
+		family := Family(match[2])
+		table := match[3]
+
+		// If fake has a family and table specified then the parsed family and
+		// table must match (but then we clear them, because we don't want them
+		// to be added to the returned objects, for backward compatibility).
+		if fake.family != "" {
+			if family != fake.family {
+				return fmt.Errorf("wrong family %q in rule", family)
+			}
+			family = ""
+		}
+		if fake.table != "" {
+			if table != fake.table {
+				return fmt.Errorf("wrong table name %q in rule", table)
+			}
+			table = ""
+		}
+
 		var obj Object
 		switch match[1] {
 		case "table":
@@ -774,7 +794,7 @@ func (fake *Fake) ParseDump(data string) (err error) {
 		default:
 			return fmt.Errorf("unknown object %s", match[1])
 		}
-		err = obj.parse(match[3])
+		err = obj.parse(family, table, match[5])
 		if err != nil {
 			return err
 		}

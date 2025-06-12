@@ -43,7 +43,7 @@ type Object interface {
 	// command. line is the part of the line after "nft add <type> <family> <tablename>"
 	// (so for most types it starts with the object name).
 	// If error is returned, Object's fields may be partially filled, therefore Object should not be used.
-	parse(line string) error
+	parse(family Family, table, line string) error
 }
 
 // Family is an nftables family

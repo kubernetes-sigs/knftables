@@ -858,6 +858,27 @@ func TestFakeParseDump(t *testing.T) {
 				add rule ip rawtest mychain @th,16,16 { 53, 80 } drop
 			`,
 		},
+		{
+			desc:      "multi-table",
+			ipFamily:  "",
+			tableName: "",
+			dump: `
+			add table ip kube-proxy
+			add chain ip kube-proxy anotherchain
+			add chain ip kube-proxy chain { comment "foo" ; }
+			add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
+			add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
+			add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+			add rule ip kube-proxy chain masquerade comment "comment"
+			add table ip6 kube-proxy
+			add chain ip6 kube-proxy anotherchain
+			add chain ip6 kube-proxy chain { comment "foo" ; }
+			add rule ip6 kube-proxy anotherchain ip saddr 2001:db8::1 drop comment "drop rule"
+			add rule ip6 kube-proxy anotherchain ip daddr 2001:db8::2 reject comment "reject rule"
+			add rule ip6 kube-proxy chain ip daddr 2001:db8::3 drop
+			add rule ip6 kube-proxy chain masquerade comment "comment"
+			`,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			rules := dedent.Dedent(tc.dump)
@@ -882,6 +903,47 @@ func TestFakeParseDump(t *testing.T) {
 			diff := cmp.Diff(rulesSlice, dumpSlice)
 			if diff != "" {
 				t.Errorf("Dump doesn't match given rules:\n%s", diff)
+			}
+
+			// fake.Table should be set if and only if this is a single-table Fake.
+			if tc.ipFamily != "" && tc.tableName != "" {
+				if fake.Tables[tc.ipFamily][tc.tableName] != fake.Table {
+					t.Errorf("Expected fake.Table to be set correctly")
+				}
+				if len(fake.Tables) != 1 || len(fake.Tables[tc.ipFamily]) != 1 {
+					t.Errorf("Expected a single table to have been parsed")
+				}
+			} else if fake.Table != nil {
+				t.Errorf("Expected fake.Table to be unset")
+			}
+
+			for family, tablesForFamily := range fake.Tables {
+				for tableName, table := range tablesForFamily {
+					// For backward compatibility, the .Family and .Table
+					// fields of parsed objects should only be set if fake
+					// doesn't have its own family/table.
+					var expectFamily Family
+					var expectTable string
+					if tc.ipFamily == "" && tc.tableName == "" {
+						expectFamily = family
+						expectTable = tableName
+					}
+					if table.Family != expectFamily || table.Name != expectTable {
+						t.Errorf("Expected parsed Table to have Family: %q, Name: %q; got %q, %q", expectFamily, expectTable, table.Family, table.Name)
+					}
+
+					for _, chain := range table.Chains {
+						if chain.Family != expectFamily || chain.Table != expectTable {
+							t.Errorf("Expected parsed Chain to have Family: %q, Name: %q; got %q, %q", expectFamily, expectTable, chain.Family, chain.Name)
+						}
+						if len(chain.Rules) > 0 && (chain.Rules[0].Family != expectFamily || chain.Rules[0].Table != expectTable) {
+							t.Errorf("Expected parsed Rule to have Family: %q, Name: %q; got %q, %q", expectFamily, expectTable, chain.Rules[0].Family, chain.Rules[0].Table)
+						}
+
+						// We only need to check one chain
+						break
+					}
+				}
 			}
 		})
 	}
