@@ -551,7 +551,7 @@ func checkExists(verb verb, objectType, name string, exists bool) error {
 func checkRuleRefs(rule *Rule, table *FakeTable) error {
 	words := strings.Split(rule.Rule, " ")
 	for i, word := range words {
-		if strings.HasPrefix(word, "@") {
+		if strings.HasPrefix(word, "@") && !strings.Contains(word, ",") {
 			name := word[1:]
 			if i > 0 && (words[i-1] == "map" || words[i-1] == "vmap") {
 				if table.Maps[name] == nil {

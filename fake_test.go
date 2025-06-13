@@ -848,6 +848,16 @@ func TestFakeParseDump(t *testing.T) {
 				add element ip6 kube-proxy service-nodeports { tcp . 3001 comment "test comment" : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
 			`,
 		},
+		{
+			desc:      "raw payload expression",
+			ipFamily:  IPv4Family,
+			tableName: "rawtest",
+			dump: `
+				add table ip rawtest
+				add chain ip rawtest mychain
+				add rule ip rawtest mychain @th,16,16 { 53, 80 } drop
+			`,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			rules := dedent.Dedent(tc.dump)
