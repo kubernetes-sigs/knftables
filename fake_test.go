@@ -275,8 +275,13 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("unexpected contents of map1: %+v", m)
 	}
 
-	// Check delete element from map works
+	// Check delete element from map works, test Destroy on a non-existent element.
 	tx = fake.NewTransaction()
+	tx.Destroy(&Element{
+		Map:   "map1",
+		Key:   []string{"1.2.3.4", "sctp", "999"},
+		Value: []string{"drop"},
+	})
 	tx.Delete(&Element{
 		Map: "map1",
 		Key: []string{"192.168.0.1", "tcp", "80"},

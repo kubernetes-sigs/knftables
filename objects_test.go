@@ -92,6 +92,12 @@ func TestObjects(t *testing.T) {
 			out:    `delete table ip handle 5`,
 		},
 		{
+			name:   "destroy table",
+			verb:   destroyVerb,
+			object: &Table{},
+			out:    `destroy table ip mytable`,
+		},
+		{
 			name:   "invalid insert table",
 			verb:   insertVerb,
 			object: &Table{},
@@ -193,6 +199,14 @@ func TestObjects(t *testing.T) {
 				Handle: PtrTo(5),
 			},
 			out: `delete flowtable ip mytable handle 5`,
+		},
+		{
+			name: "destroy flowtable",
+			verb: destroyVerb,
+			object: &Flowtable{
+				Name: "myflowtable",
+			},
+			out: `destroy flowtable ip mytable myflowtable`,
 		},
 		{
 			name: "invalid insert flowtable",
@@ -297,6 +311,12 @@ func TestObjects(t *testing.T) {
 			verb:   deleteVerb,
 			object: &Chain{Handle: PtrTo(5)},
 			out:    `delete chain ip mytable handle 5`,
+		},
+		{
+			name:   "destroy chain",
+			verb:   destroyVerb,
+			object: &Chain{Name: "mychain"},
+			out:    `destroy chain ip mytable mychain`,
 		},
 		{
 			name:   "invalid insert chain",
@@ -433,6 +453,12 @@ func TestObjects(t *testing.T) {
 			out:    `delete rule ip mytable mychain handle 2`,
 		},
 		{
+			name:   "destroy rule",
+			verb:   destroyVerb,
+			object: &Rule{Chain: "mychain", Rule: "drop", Handle: PtrTo(2)},
+			out:    `destroy rule ip mytable mychain handle 2`,
+		},
+		{
 			name:   "invalid create rule",
 			verb:   createVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop"},
@@ -547,6 +573,12 @@ func TestObjects(t *testing.T) {
 			out:    `delete set ip mytable handle 5`,
 		},
 		{
+			name:   "destroy set",
+			verb:   destroyVerb,
+			object: &Set{Name: "myset", Type: "ipv4_addr"},
+			out:    `destroy set ip mytable myset`,
+		},
+		{
 			name:   "invalid insert set",
 			verb:   insertVerb,
 			object: &Set{Name: "myset", Type: "ipv4_addr"},
@@ -654,6 +686,12 @@ func TestObjects(t *testing.T) {
 			out:    `delete map ip mytable handle 5`,
 		},
 		{
+			name:   "destroy map",
+			verb:   destroyVerb,
+			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
+			out:    `destroy map ip mytable mymap`,
+		},
+		{
 			name:   "invalid insert map",
 			verb:   insertVerb,
 			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
@@ -740,6 +778,18 @@ func TestObjects(t *testing.T) {
 			out:    `delete element ip mytable mymap { 10.0.0.1 }`,
 		},
 		{
+			name:   "destroy (set) element",
+			verb:   destroyVerb,
+			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
+			out:    `destroy element ip mytable myset { 10.0.0.1 }`,
+		},
+		{
+			name:   "destroy (map) element",
+			verb:   destroyVerb,
+			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}},
+			out:    `destroy element ip mytable mymap { 10.0.0.1 }`,
+		},
+		{
 			name:   "invalid add element with no Set",
 			verb:   addVerb,
 			object: &Element{Key: []string{"10.0.0.1"}},
@@ -762,6 +812,12 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Element{Set: "myset"},
 			err:    "no key",
+		},
+		{
+			name:   "invalid add map element with no Value",
+			verb:   addVerb,
+			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}},
+			err:    "no map value",
 		},
 		{
 			name:   "invalid add element with Value but no Key",
@@ -793,6 +849,7 @@ func TestObjects(t *testing.T) {
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
 			err:    "not implemented",
 		},
+
 		// Counters
 		{
 			name:   "add counter with comment",
@@ -831,13 +888,13 @@ func TestObjects(t *testing.T) {
 			out:    "create counter ip mytable test-counter { comment \"counter for unit tests\" ; }",
 		},
 		{
-			name:   "invalid crete counter with packets without bytes",
+			name:   "invalid create counter with packets without bytes",
 			verb:   createVerb,
 			object: &Counter{Name: "test-counter", Packets: PtrTo[uint64](100)},
 			err:    "cannot specify Packets without Bytes in create operation",
 		},
 		{
-			name:   "invalid crete counter with bytes without packets",
+			name:   "invalid create counter with bytes without packets",
 			verb:   createVerb,
 			object: &Counter{Name: "test-counter", Bytes: PtrTo[uint64](1500)},
 			err:    "cannot specify Bytes without Packets in create operation",
@@ -859,6 +916,12 @@ func TestObjects(t *testing.T) {
 			verb:   deleteVerb,
 			object: &Counter{Name: "test-counter", Handle: PtrTo(5)},
 			out:    "delete counter ip mytable handle 5",
+		},
+		{
+			name:   "destroy counter by name",
+			verb:   destroyVerb,
+			object: &Counter{Name: "test-counter"},
+			out:    "destroy counter ip mytable test-counter",
 		},
 		{
 			name:   "invalid insert counter",
@@ -921,8 +984,8 @@ func TestObjects(t *testing.T) {
 		})
 	}
 
-	// add, create, flush, insert, replace, delete, reset
-	numVerbs := 7
+	// add, create, flush, insert, replace, reset, delete, destroy
+	numVerbs := 8
 	for objType, verbs := range tested {
 		if len(verbs) != numVerbs {
 			t.Errorf("expected to test %d verbs for %s, got %d (%v)", numVerbs, objType, len(verbs), verbs)
