@@ -52,10 +52,11 @@ if err != nil {
 ```
 
 (If you want to operate on multiple tables or multiple nftables
-families, you will need separate `Interface` objects for each. If you
-need to check whether the system supports an nftables feature as with
-`nft --check`, use `nft.Check()`, which works the same as `nft.Run()`
-below.)
+families, you have two options: you can either create separate
+`Interface` objects for each table, or you can create a single
+`Interface` and pass `""` for the family and table. In that case, you
+will need to explicitly fill in the `Family` and `Table` fields of
+every `Chain`, `Rule`, etc, object you create.)
 
 You can use the `List`, `ListRules`, and `ListElements` methods on the
 `Interface` to check if objects exist. `List` returns the names of
@@ -115,6 +116,9 @@ use the `knftables.IsNotFound()` and `knftables.IsAlreadyExists()`
 methods to check for those well-known error types. In a large
 transaction, there is no supported way to determine exactly which
 operation failed.
+
+(You can also pass a transaction to `nft.Check()`, which uses `nft
+--check`, but otherwise behaves the same as `nft.Run()`.)
 
 ## `knftables.Transaction` operations
 

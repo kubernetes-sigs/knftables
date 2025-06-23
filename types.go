@@ -33,7 +33,7 @@ const (
 // implement this interface.
 type Object interface {
 	// validate validates an object for an operation
-	validate(verb verb) error
+	validate(verb verb, ctx *nftContext) error
 
 	// writeOperation writes out an "nft" operation involving the object. It assumes
 	// that the object has been validated.
@@ -43,7 +43,7 @@ type Object interface {
 	// command. line is the part of the line after "nft add <type> <family> <tablename>"
 	// (so for most types it starts with the object name).
 	// If error is returned, Object's fields may be partially filled, therefore Object should not be used.
-	parse(line string) error
+	parse(family Family, table, line string) error
 }
 
 // Family is an nftables family
@@ -82,6 +82,14 @@ const (
 
 // Table represents an nftables table.
 type Table struct {
+	// Family is the nftables family of the table. You do not normally need to fill
+	// this in because it will be filled in for you automatically from the Interface.
+	Family Family
+
+	// Name is the name of the table. You do not normally need to fill this in
+	// because it will be filled in for you automatically from the Interface.
+	Name string
+
 	// Comment is an optional comment for the table. (Requires kernel >= 5.10 and
 	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
 	// nft >= 1.0.8 to include comments in List() results.)
@@ -213,6 +221,15 @@ const (
 // Chain represents an nftables chain; either a "base chain" (if Type, Hook, and Priority
 // are specified), or a "regular chain" (if they are not).
 type Chain struct {
+	// Family is the nftables family of the chain's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the chain's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the chain.
 	Name string
 
@@ -247,6 +264,15 @@ type Chain struct {
 
 // Rule represents a rule in a chain
 type Rule struct {
+	// Family is the nftables family of the rule's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the rule's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Chain is the name of the chain that contains this rule
 	Chain string
 
@@ -306,6 +332,15 @@ const (
 
 // Set represents the definition of an nftables set (but not its elements)
 type Set struct {
+	// Family is the nftables family of the set's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the set's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the set.
 	Name string
 
@@ -351,6 +386,15 @@ type Set struct {
 
 // Map represents the definition of an nftables map (but not its elements)
 type Map struct {
+	// Family is the nftables family of the map's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the map's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the map.
 	Name string
 
@@ -392,6 +436,15 @@ type Map struct {
 
 // Element represents a set or map element
 type Element struct {
+	// Family is the nftables family of the element's table. You do not normally need
+	// to fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the element's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Set is the name of the set that contains this element (or the empty string if
 	// this is a map element.)
 	Set string
@@ -423,6 +476,15 @@ const (
 // Flowtable represents an nftables flowtable.
 // https://wiki.nftables.org/wiki-nftables/index.php/Flowtables
 type Flowtable struct {
+	// Family is the nftables family of the flowtable's table. You do not normally
+	// need to fill this in because it will be filled in for you automatically from
+	// the Interface.
+	Family Family
+
+	// Table is the name of the flowtable's table. You do not normally need to fill
+	// this in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the flowtable.
 	Name string
 
@@ -441,6 +503,15 @@ type Flowtable struct {
 
 // Counter represents named counter
 type Counter struct {
+	// Family is the nftables family of the counter's table. You do not normally
+	// need to fill this in because it will be filled in for you automatically from
+	// the Interface.
+	Family Family
+
+	// Table is the name of the counter's table. You do not normally need to fill
+	// this in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the named counter
 	Name string
 

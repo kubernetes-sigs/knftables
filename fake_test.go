@@ -858,6 +858,27 @@ func TestFakeParseDump(t *testing.T) {
 				add rule ip rawtest mychain @th,16,16 { 53, 80 } drop
 			`,
 		},
+		{
+			desc:      "multi-table",
+			ipFamily:  "",
+			tableName: "",
+			dump: `
+			add table ip kube-proxy
+			add chain ip kube-proxy anotherchain
+			add chain ip kube-proxy chain { comment "foo" ; }
+			add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
+			add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
+			add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+			add rule ip kube-proxy chain masquerade comment "comment"
+			add table ip6 kube-proxy
+			add chain ip6 kube-proxy anotherchain
+			add chain ip6 kube-proxy chain { comment "foo" ; }
+			add rule ip6 kube-proxy anotherchain ip saddr 2001:db8::1 drop comment "drop rule"
+			add rule ip6 kube-proxy anotherchain ip daddr 2001:db8::2 reject comment "reject rule"
+			add rule ip6 kube-proxy chain ip daddr 2001:db8::3 drop
+			add rule ip6 kube-proxy chain masquerade comment "comment"
+			`,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			rules := dedent.Dedent(tc.dump)
@@ -883,6 +904,204 @@ func TestFakeParseDump(t *testing.T) {
 			if diff != "" {
 				t.Errorf("Dump doesn't match given rules:\n%s", diff)
 			}
+
+			// fake.Table should be set if and only if this is a single-table Fake.
+			if tc.ipFamily != "" && tc.tableName != "" {
+				if fake.Tables[tc.ipFamily][tc.tableName] != fake.Table {
+					t.Errorf("Expected fake.Table to be set correctly")
+				}
+				if len(fake.Tables) != 1 || len(fake.Tables[tc.ipFamily]) != 1 {
+					t.Errorf("Expected a single table to have been parsed")
+				}
+			} else if fake.Table != nil {
+				t.Errorf("Expected fake.Table to be unset")
+			}
+
+			for family, tablesForFamily := range fake.Tables {
+				for tableName, table := range tablesForFamily {
+					// For backward compatibility, the .Family and .Table
+					// fields of parsed objects should only be set if fake
+					// doesn't have its own family/table.
+					var expectFamily Family
+					var expectTable string
+					if tc.ipFamily == "" && tc.tableName == "" {
+						expectFamily = family
+						expectTable = tableName
+					}
+					if table.Family != expectFamily || table.Name != expectTable {
+						t.Errorf("Expected parsed Table to have Family: %q, Name: %q; got %q, %q", expectFamily, expectTable, table.Family, table.Name)
+					}
+
+					for _, chain := range table.Chains {
+						if chain.Family != expectFamily || chain.Table != expectTable {
+							t.Errorf("Expected parsed Chain to have Family: %q, Name: %q; got %q, %q", expectFamily, expectTable, chain.Family, chain.Name)
+						}
+						if len(chain.Rules) > 0 && (chain.Rules[0].Family != expectFamily || chain.Rules[0].Table != expectTable) {
+							t.Errorf("Expected parsed Rule to have Family: %q, Name: %q; got %q, %q", expectFamily, expectTable, chain.Rules[0].Family, chain.Rules[0].Table)
+						}
+
+						// We only need to check one chain
+						break
+					}
+				}
+			}
 		})
+	}
+}
+
+func TestFakeMultiTable(t *testing.T) {
+	fake := NewFake("", "")
+
+	tx := fake.NewTransaction()
+
+	tx.Add(&Table{
+		Family: IPv4Family,
+		Name:   "kube-proxy",
+	})
+	tx.Add(&Chain{
+		Family:  IPv4Family,
+		Table:   "kube-proxy",
+		Name:    "chain",
+		Comment: PtrTo("foo"),
+	})
+	tx.Add(&Rule{
+		Family: IPv4Family,
+		Table:  "kube-proxy",
+		Chain:  "chain",
+		Rule:   "ip daddr 10.0.0.0/8 drop",
+	})
+	tx.Add(&Rule{
+		Family:  IPv4Family,
+		Table:   "kube-proxy",
+		Chain:   "chain",
+		Rule:    "masquerade",
+		Comment: PtrTo("comment"),
+	})
+
+	tx.Add(&Table{
+		Family: IPv6Family,
+		Name:   "anothertable",
+	})
+	tx.Add(&Chain{
+		Family: IPv6Family,
+		Table:  "anothertable",
+		Name:   "anotherchain",
+	})
+	tx.Add(&Rule{
+		Family:  IPv6Family,
+		Table:   "anothertable",
+		Chain:   "anotherchain",
+		Rule:    "ip saddr 1.2.3.4 drop",
+		Comment: PtrTo("drop rule"),
+	})
+	tx.Add(&Rule{
+		Family:  IPv6Family,
+		Table:   "anothertable",
+		Chain:   "anotherchain",
+		Rule:    "ip daddr 5.6.7.8 reject",
+		Comment: PtrTo("reject rule"),
+	})
+
+	// The transaction should contain exactly those commands, in order
+	expected := strings.TrimPrefix(dedent.Dedent(`
+		add table ip kube-proxy
+		add chain ip kube-proxy chain { comment "foo" ; }
+		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add rule ip kube-proxy chain masquerade comment "comment"
+		add table ip6 anothertable
+		add chain ip6 anothertable anotherchain
+		add rule ip6 anothertable anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
+		add rule ip6 anothertable anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
+		`), "\n")
+	diff := cmp.Diff(expected, tx.String())
+	if diff != "" {
+		t.Errorf("unexpected transaction content:\n%s", diff)
+	}
+
+	err := fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	if fake.Table != nil {
+		t.Fatalf("fake.Table is set")
+	}
+
+	v4Table := fake.Tables[IPv4Family]["kube-proxy"]
+	if v4Table == nil {
+		t.Fatalf("fake.Tables[ip][kube-proxy] is nil")
+	}
+	v6Table := fake.Tables[IPv6Family]["anothertable"]
+	if v6Table == nil {
+		t.Fatalf("fake.Tables[ip6][anothertable] is nil")
+	}
+
+	chain := v4Table.Chains["chain"]
+	if chain == nil || len(v4Table.Chains) != 1 {
+		t.Fatalf("unexpected contents of table.Chains: %+v", v4Table.Chains)
+	}
+
+	if len(chain.Rules) != 2 {
+		t.Fatalf("unexpected chain.Rules length: expected 2, got %d", len(chain.Rules))
+	}
+	expectedRule := "ip daddr 10.0.0.0/8 drop"
+	if chain.Rules[0].Rule != expectedRule {
+		t.Fatalf("unexpected chain.Rules content: expected %q, got %q", expectedRule, chain.Rules[0].Rule)
+	}
+	expectedRule = "masquerade"
+	if chain.Rules[1].Rule != expectedRule {
+		t.Fatalf("unexpected chain.Rules content: expected %q, got %q", expectedRule, chain.Rules[1].Rule)
+	}
+	expectedComment := "comment"
+	if chain.Rules[1].Comment == nil {
+		t.Fatalf("unexpected chain.Rules content: expected comment %q, got nil", expectedComment)
+	} else if *chain.Rules[1].Comment != expectedComment {
+		t.Fatalf("unexpected chain.Rules content: expected comment %q, got %q", expectedComment, *chain.Rules[1].Comment)
+	}
+
+	chain = v6Table.Chains["anotherchain"]
+	if chain == nil || len(v6Table.Chains) != 1 {
+		t.Fatalf("unexpected contents of v6Table.Chains: %+v", v6Table.Chains)
+	}
+
+	if len(chain.Rules) != 2 {
+		t.Fatalf("unexpected chain.Rules length: expected 2, got %d", len(chain.Rules))
+	}
+	expectedRule = "ip saddr 1.2.3.4 drop"
+	if chain.Rules[0].Rule != expectedRule {
+		t.Fatalf("unexpected chain.Rules content: expected %q, got %q", expectedRule, chain.Rules[0].Rule)
+	}
+	// Save this Rule object for later
+	ruleToDelete := chain.Rules[0]
+
+	// Dump() includes both tables
+	expected = strings.TrimPrefix(dedent.Dedent(`
+		add table ip kube-proxy
+		add chain ip kube-proxy chain { comment "foo" ; }
+		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add rule ip kube-proxy chain masquerade comment "comment"
+		add table ip6 anothertable
+		add chain ip6 anothertable anotherchain
+		add rule ip6 anothertable anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
+		add rule ip6 anothertable anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
+		`), "\n")
+	diff = cmp.Diff(expected, fake.Dump())
+	if diff != "" {
+		t.Errorf("unexpected Dump content:\n%s", diff)
+	}
+
+	// Delete a rule from the non-default table, and ensure it was actually deleted.
+	tx = fake.NewTransaction()
+	tx.Delete(ruleToDelete)
+	err = fake.Run(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("unexpected error from Run: %v", err)
+	}
+
+	tx = fake.NewTransaction()
+	tx.Delete(ruleToDelete)
+	err = fake.Run(context.Background(), tx)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("unexpected error from Run: %v", err)
 	}
 }
