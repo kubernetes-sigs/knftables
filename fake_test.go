@@ -92,6 +92,19 @@ func TestFakeRun(t *testing.T) {
 		Name:    "myflowtable",
 		Devices: []string{"eth0", "eth1"},
 	})
+	tx.Add(&Chain{
+		Name: "fastpathchain",
+	})
+	tx.Add(&Rule{
+		Chain:   "fastpathchain",
+		Rule:    "ip saddr 192.168.0.1 flow add @myflowtable",
+		Comment: PtrTo("flow add"),
+	})
+	tx.Add(&Rule{
+		Chain:   "fastpathchain",
+		Rule:    "ip saddr 192.168.0.2 flow offload @myflowtable",
+		Comment: PtrTo("flow offload"),
+	})
 	tx.Add(&Counter{
 		Name:    "test-counter",
 		Comment: PtrTo("test counter comment"),
@@ -112,6 +125,9 @@ func TestFakeRun(t *testing.T) {
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add flowtable ip kube-proxy myflowtable { devices = { eth0, eth1 } ; }
+		add chain ip kube-proxy fastpathchain
+		add rule ip kube-proxy fastpathchain ip saddr 192.168.0.1 flow add @myflowtable comment "flow add"
+		add rule ip kube-proxy fastpathchain ip saddr 192.168.0.2 flow offload @myflowtable comment "flow offload"
 		add counter ip kube-proxy test-counter { packets 300 bytes 5000 ; comment "test counter comment" ; }
 		`), "\n")
 	diff := cmp.Diff(expected, tx.String())
@@ -129,7 +145,7 @@ func TestFakeRun(t *testing.T) {
 	}
 
 	chain := fake.Table.Chains["chain"]
-	if chain == nil || len(fake.Table.Chains) != 2 {
+	if chain == nil || len(fake.Table.Chains) != 3 {
 		t.Fatalf("unexpected contents of table.Chains: %+v", fake.Table.Chains)
 	}
 
@@ -182,12 +198,15 @@ func TestFakeRun(t *testing.T) {
 		add flowtable ip kube-proxy myflowtable { devices = { eth0, eth1 } ; }
 		add chain ip kube-proxy anotherchain
 		add chain ip kube-proxy chain { comment "foo" ; }
+		add chain ip kube-proxy fastpathchain
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add counter ip kube-proxy test-counter { packets 300 bytes 5000 ; comment "test counter comment" ; }
 		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
 		add rule ip kube-proxy chain masquerade comment "comment"
+		add rule ip kube-proxy fastpathchain ip saddr 192.168.0.1 flow add @myflowtable comment "flow add"
+		add rule ip kube-proxy fastpathchain ip saddr 192.168.0.2 flow offload @myflowtable comment "flow offload"
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
@@ -202,7 +221,7 @@ func TestFakeRun(t *testing.T) {
 	}
 
 	sort.Strings(chains)
-	expectedChains := []string{"chain", "anotherchain"}
+	expectedChains := []string{"chain", "anotherchain", "fastpathchain"}
 	sort.Strings(expectedChains)
 	if !reflect.DeepEqual(chains, expectedChains) {
 		t.Errorf("unexpected result from List(chains): %v", chains)
@@ -225,11 +244,14 @@ func TestFakeRun(t *testing.T) {
 		add flowtable ip kube-proxy myflowtable { devices = { eth0, eth1 } ; }
 		add chain ip kube-proxy anotherchain
 		add chain ip kube-proxy chain { comment "foo" ; }
+		add chain ip kube-proxy fastpathchain
 		add map ip kube-proxy map1 { type ipv4_addr . inet_proto . inet_service : verdict ; }
 		add counter ip kube-proxy test-counter { packets 0 bytes 0 ; comment "test counter comment" ; }
 		add rule ip kube-proxy anotherchain ip saddr 1.2.3.4 drop comment "drop rule"
 		add rule ip kube-proxy anotherchain ip daddr 5.6.7.8 reject comment "reject rule"
 		add rule ip kube-proxy chain ip daddr 10.0.0.0/8 drop
+		add rule ip kube-proxy fastpathchain ip saddr 192.168.0.1 flow add @myflowtable comment "flow add"
+		add rule ip kube-proxy fastpathchain ip saddr 192.168.0.2 flow offload @myflowtable comment "flow offload"
 		add element ip kube-proxy map1 { 192.168.0.1 . tcp . 80 : drop }
 		add element ip kube-proxy map1 { 192.168.0.2 . tcp . 443 comment "with a comment" : goto anotherchain }
 		`), "\n")
