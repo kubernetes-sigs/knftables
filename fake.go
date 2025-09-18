@@ -621,7 +621,7 @@ func checkRuleRefs(rule *Rule, table *FakeTable) error {
 				if table.Maps[name] == nil {
 					return notFoundError("no such map %q", name)
 				}
-			} else if i > 0 && words[i-1] == "offload" {
+			} else if i > 0 && (words[i-1] == "offload" || words[i-1] == "add") {
 				if table.Flowtables[name] == nil {
 					return notFoundError("no such flowtable %q", name)
 				}
