@@ -442,6 +442,17 @@ func TestListElements(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "concat plus prefix (plus counter)",
+			objectType: "set",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.1.1", "release_name": "Commodore Bullmoose #2", "json_schema_version": 1}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": ["ipv4_addr", "ipv4_addr"], "handle": 3, "flags": ["interval"], "elem": [{"elem": {"val": {"concat": ["10.0.0.1", {"prefix": {"addr": "192.168.100.0", "len": 24}}]}, "counter": {"packets": 0, "bytes": 0}}}], "stmt": [{"counter": null}]}}]}`,
+			listOutput: []*Element{
+				{
+					Set: "test",
+					Key: []string{"10.0.0.1", "192.168.100.0/24"},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")

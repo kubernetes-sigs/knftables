@@ -481,12 +481,14 @@ func (nft *realNFTables) ListElements(ctx context.Context, objectType, name stri
 			key, value = tuple[0], tuple[1]
 		}
 
-		// If the element has a comment, then key will be a compound object like:
+		// If the element has a comment or a counter, then key will be a compound
+		// object like:
 		//
 		//   {
 		//     "elem": {
 		//       "val": "192.168.0.1",
-		//       "comment": "this is a comment"
+		//       "comment": "this is a comment",
+		//       "counter": { "packets": 0, "bytes": 0 }
 		//     }
 		//   }
 		//
@@ -564,15 +566,13 @@ func parseElementValue(json interface{}) ([]string, error) {
 		return []string{fmt.Sprintf("%d", int(val))}, nil
 	case map[string]interface{}:
 		if concat, _ := jsonVal[[]interface{}](val, "concat"); concat != nil {
-			vals := make([]string, len(concat))
+			vals := make([]string, 0, len(concat))
 			for i := range concat {
-				if str, ok := concat[i].(string); ok {
-					vals[i] = str
-				} else if num, ok := concat[i].(float64); ok {
-					vals[i] = fmt.Sprintf("%d", int(num))
-				} else {
-					return nil, fmt.Errorf("could not parse element value %q", concat[i])
+				newVals, err := parseElementValue(concat[i])
+				if err != nil {
+					return nil, err
 				}
+				vals = append(vals, newVals...)
 			}
 			return vals, nil
 		} else if prefix, _ := jsonVal[map[string]interface{}](val, "prefix"); prefix != nil {
