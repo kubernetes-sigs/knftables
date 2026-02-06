@@ -367,16 +367,26 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
 	// All currently-existing nftables object types have plural forms that are just
 	// the singular form plus 's'.
-	var typeSingular, typePlural string
+	var typeSingular string
 	if objectType[len(objectType)-1] == 's' {
 		typeSingular = objectType[:len(objectType)-1]
-		typePlural = objectType
 	} else {
 		typeSingular = objectType
-		typePlural = objectType + "s"
 	}
 
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", typePlural, string(nft.family))
+	var cmd *exec.Cmd
+	if nft.table != "" {
+		// List objects only from the specified table by using "list table" command.
+		// This is consistent with ListRules() and ListElements() which also scope
+		// their queries to a specific table, and avoids returning objects from
+		// unrelated tables that may exist in the same nftables family.
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	} else {
+		// When no specific table is set, list all objects of the given type across all tables.
+		// This handles the case where the Interface was created without a specific table.
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", typeSingular+"s", string(nft.family))
+	}
+
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -389,11 +399,8 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 	var result []string
 	for _, obj := range objects {
-		objTable, _ := jsonVal[string](obj, "table")
-		if objTable != nft.table {
-			continue
-		}
-
+		// When querying a specific table, no filtering needed as "list table" only returns
+		// objects from that table. When table is empty, we return all objects across all tables.
 		if name, ok := jsonVal[string](obj, "name"); ok {
 			result = append(result, name)
 		}
