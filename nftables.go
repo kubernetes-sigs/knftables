@@ -41,8 +41,8 @@ type Interface interface {
 	Check(ctx context.Context, tx *Transaction) error
 
 	// List returns a list of the names of the objects of objectType ("chain", "set",
-	// "map" or "counter") in the table. If there are no such objects, this will return an empty
-	// list and no error.
+	// "map" or "counter") in the table. If there are no such objects, this will
+	// return an empty list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
 	// ListRules returns a list of the rules in a chain, in order. If no chain name is
@@ -59,7 +59,7 @@ type Interface interface {
 	// return an empty list and no error.
 	ListElements(ctx context.Context, objectType, name string) ([]*Element, error)
 
-	// ListCounters returns a list of the counters.
+	// ListCounters returns a list of the counters in the table.
 	ListCounters(ctx context.Context) ([]*Counter, error)
 }
 
@@ -365,35 +365,32 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 
 // List is part of Interface.
 func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
-	// All currently-existing nftables object types have plural forms that are just
-	// the singular form plus 's'.
-	var typeSingular, typePlural string
-	if objectType[len(objectType)-1] == 's' {
-		typeSingular = objectType[:len(objectType)-1]
-		typePlural = objectType
-	} else {
-		typeSingular = objectType
-		typePlural = objectType + "s"
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use List() on a knftables.Interface with no associated family/table")
 	}
 
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", typePlural, string(nft.family))
+	// objectType is allowed to be either singular or plural. All currently-existing
+	// nftables object types have plural forms that are just the singular form plus 's',
+	// and none have singular forms ending in 's'.
+	if objectType[len(objectType)-1] == 's' {
+		objectType = objectType[:len(objectType)-1]
+	}
+
+	// We want to restrict nft to looking only at our table, so we have to do "list table"
+	// rather than any variant of "list <objectType>".
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
 	}
 
-	objects, err := getJSONObjects(out, typeSingular)
+	objects, err := getJSONObjects(out, objectType)
 	if err != nil {
 		return nil, err
 	}
 
 	var result []string
 	for _, obj := range objects {
-		objTable, _ := jsonVal[string](obj, "table")
-		if objTable != nft.table {
-			continue
-		}
-
 		if name, ok := jsonVal[string](obj, "name"); ok {
 			result = append(result, name)
 		}
@@ -403,7 +400,10 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 // ListRules is part of Interface
 func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, error) {
-	// If no chain is given, return all rules from within the table.
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use ListRules() on a knftables.Interface with no associated family/table")
+	}
+
 	var cmd *exec.Cmd
 	if chain == "" {
 		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
@@ -449,6 +449,10 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 // ListElements is part of Interface
 func (nft *realNFTables) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use ListElements() on a knftables.Interface with no associated family/table")
+	}
+
 	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", objectType, string(nft.family), nft.table, name)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
@@ -606,6 +610,10 @@ func parseElementValue(json interface{}) ([]string, error) {
 
 // ListCounters is part of Interface
 func (nft *realNFTables) ListCounters(ctx context.Context) ([]*Counter, error) {
+	if nft.table == "" {
+		return nil, fmt.Errorf("can't use ListCounters() on a knftables.Interface with no associated family/table")
+	}
+
 	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "counters", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
