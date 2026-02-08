@@ -178,6 +178,47 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestListAll(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		nftOutput  string
+		listOutput map[string][]string
+	}{
+		{
+			name:       "empty",
+			nftOutput:  `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}]}`,
+			listOutput: map[string][]string{},
+		},
+		{
+			name:      "non-empty",
+			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"chain": {"family": "ip", "table": "testing", "name": "prerouting", "handle": 1, "type": "nat", "hook": "prerouting", "prio": -100, "policy": "accept"}}, {"chain": {"family": "ip", "table": "testing", "name": "output", "handle": 3, "type": "nat", "hook": "output", "prio": 0, "policy": "accept"}}, {"chain": {"family": "ip", "table": "testing", "name": "postrouting", "handle": 7, "type": "nat", "hook": "postrouting", "prio": 100, "policy": "accept"}}, {"chain": {"family": "ip", "table": "testing", "name": "KUBE-SERVICES", "handle": 11}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 171, "expr": [{"match": {"op": "==", "left": {"meta": {"key": "iifname"}}, "right": "lo"}}, {"accept": null}]}}, {"set": {"family": "ip", "name": "test", "table": "testing", "type": "inet_proto", "handle": 16, "elem": []}}, {"counter": {"family": "ip", "name": "test-counter", "table": "testing", "handle": 1, "comment": "test-counter-comment", "packets": 100, "bytes": 5000}}]}`,
+			listOutput: map[string][]string{
+				"chain":   {"prerouting", "output", "postrouting", "KUBE-SERVICES"},
+				"set":     {"test"},
+				"counter": {"test-counter"},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			nft, fexec, _ := newTestInterface(t, IPv4Family, "testing")
+
+			fexec.expected = append(fexec.expected,
+				expectedCmd{
+					args:   []string{"/nft", "--json", "list", "table", "ip", "testing"},
+					stdout: tc.nftOutput,
+				},
+			)
+			result, err := nft.ListAll(context.Background())
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(result, tc.listOutput) {
+				t.Errorf("unexpected result: wanted %v got %v", tc.listOutput, result)
+			}
+		})
+	}
+}
+
 func TestRun(t *testing.T) {
 	nft, fexec, _ := newTestInterface(t, IPv4Family, "kube-proxy")
 

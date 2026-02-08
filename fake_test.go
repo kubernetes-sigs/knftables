@@ -227,6 +227,31 @@ func TestFakeRun(t *testing.T) {
 		t.Errorf("unexpected result from List(chains): %v", chains)
 	}
 
+	objs, err := fake.ListAll(context.Background())
+	if err != nil {
+		t.Errorf("unexpected error listing all: %v", err)
+	}
+	chains = objs["chain"]
+	sort.Strings(chains)
+	if !reflect.DeepEqual(chains, expectedChains) {
+		t.Errorf("unexpected result from ListAll(chain): %v", chains)
+	}
+	maps := objs["map"]
+	if len(maps) != 1 || maps[0] != "map1" {
+		t.Errorf("unexpected result from ListAll(map): %v", maps)
+	}
+	flowtables := objs["flowtable"]
+	if len(flowtables) != 1 || flowtables[0] != "myflowtable" {
+		t.Errorf("unexpected result from ListAll(flowtable): %v", flowtables)
+	}
+	counters := objs["counter"]
+	if len(counters) != 1 || counters[0] != "test-counter" {
+		t.Errorf("unexpected result from ListAll(counter): %v", counters)
+	}
+	if len(objs) != 4 {
+		t.Errorf("unexpected result from ListAll(): expected %d types, got %d: %v", 4, len(objs), objs)
+	}
+
 	tx = fake.NewTransaction()
 	tx.Delete(ruleToDelete)
 	tx.Reset(&Counter{Name: "test-counter"})

@@ -40,6 +40,11 @@ type Interface interface {
 	// result.
 	Check(ctx context.Context, tx *Transaction) error
 
+	// ListAll returns a map containing the names of all objects in the table,
+	// grouped by object type. If there are no objects, this will return an empty list
+	// and no error.
+	ListAll(ctx context.Context) (map[string][]string, error)
+
 	// List returns a list of the names of the objects of objectType ("chain", "set",
 	// "map" or "counter") in the table. If there are no such objects, this will
 	// return an empty list and no error.
@@ -374,6 +379,37 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 		}
 	}
 	return objects, nil
+}
+
+// ListAll is part of Interface.
+func (nft *realNFTables) ListAll(ctx context.Context) (map[string][]string, error) {
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	out, err := nft.exec.Run(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run nft: %w", err)
+	}
+
+	nftablesResult, err := parseJSONObjects(out)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]string)
+	for i, objContainer := range nftablesResult {
+		if i == 0 {
+			// Skip "metainfo"
+			continue
+		}
+		for objectType, obj := range objContainer {
+			if name, ok := jsonVal[string](obj, "name"); ok {
+				result[objectType] = append(result[objectType], name)
+			}
+			// Shouldn't be more than one field in objContainer, but ignore it
+			// if there is.
+			break
+		}
+	}
+	return result, nil
 }
 
 // List is part of Interface.
