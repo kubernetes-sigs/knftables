@@ -283,9 +283,9 @@ func jsonVal[T any](json map[string]interface{}, key string) (T, bool) {
 	return zero, false
 }
 
-// getJSONObjects takes the output of "nft -j list", validates it, and returns an array
-// of just the objects of objectType.
-func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, error) {
+// parseJSONResult takes the output of "nft -j list", validates it, and returns the array
+// of objects (including the "metainfo" object)
+func parseJSONObjects(listOutput string) ([]map[string]map[string]interface{}, error) {
 	// listOutput should contain JSON looking like:
 	//
 	// {
@@ -316,23 +316,7 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	//   ]
 	// }
 	//
-	// In this case, given objectType "chain", we would return
-	//
-	// [
-	//   {
-	//     "family": "ip",
-	//     "table": "kube-proxy",
-	//     "name": "KUBE-SERVICES",
-	//     "handle": 3
-	//   },
-	//   {
-	//     "family": "ip",
-	//     "table": "kube-proxy",
-	//     "name": "KUBE-NODEPORTS",
-	//     "handle": 4
-	//   },
-	//   ...
-	// ]
+	// parseJSONResult returns the array of objects tagged "nftables".
 
 	jsonResult := map[string][]map[string]map[string]interface{}{}
 	if err := json.Unmarshal([]byte(listOutput), &jsonResult); err != nil {
@@ -351,6 +335,35 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 	// a float64 since we didn't tell it otherwise.
 	if version, ok := jsonVal[float64](metainfo, "json_schema_version"); !ok || version != 1.0 {
 		return nil, fmt.Errorf("could not find supported json_schema_version in nft output %q", listOutput)
+	}
+	return nftablesResult, nil
+}
+
+// getJSONObjects takes the output of "nft -j list", validates it, and returns an array
+// of just the objects of objectType.
+func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, error) {
+	// Given the result from the parseJSONObjects example above, and objectType
+	// "chain", we would return
+	//
+	// [
+	//   {
+	//     "family": "ip",
+	//     "table": "kube-proxy",
+	//     "name": "KUBE-SERVICES",
+	//     "handle": 3
+	//   },
+	//   {
+	//     "family": "ip",
+	//     "table": "kube-proxy",
+	//     "name": "KUBE-NODEPORTS",
+	//     "handle": 4
+	//   },
+	//   ...
+	// ]
+
+	nftablesResult, err := parseJSONObjects(listOutput)
+	if err != nil {
+		return nil, err
 	}
 
 	var objects []map[string]interface{}
