@@ -87,6 +87,10 @@ const (
 	// that you can use the `tx.Destroy()` method to be compatible with destroy
 	// emulation; see the docs for that method for more details.
 	EmulateDestroy Option = "EmulateDestroy"
+
+	// disableNetlink is an internal option used for testing to force the use of the
+	// nft command-line binary rather than the netlink library.
+	disableNetlink Option = "DisableNetlink"
 )
 
 type nftContext struct {
@@ -115,6 +119,8 @@ type realNFTables struct {
 
 	exec execer
 	path string
+
+	nl netlink
 }
 
 func optionSet(options []Option, option Option) bool {
@@ -206,6 +212,18 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 		}
 		// Can't set this until after doing the test above
 		nft.emulateDestroy = emulateDestroy
+	}
+
+	// Use netlink directly to avoid the performance overhead
+	// of executing nft list commands for every operation and
+	// avoid parsing nft output.
+	// TODO: Only some commands are implemented.
+	if !optionSet(options, disableNetlink) {
+		nl, err := newNetlinkAdapter(family, table)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create netlink adapter: %w", err)
+		}
+		nft.nl = nl
 	}
 
 	return nft, nil
@@ -383,6 +401,10 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 
 // ListAll is part of Interface.
 func (nft *realNFTables) ListAll(ctx context.Context) (map[string][]string, error) {
+	if nft.nl != nil {
+		return nft.nl.ListAll(ctx)
+	}
+
 	cmd := exec.CommandContext(ctx, nft.path, "--json", "--terse", "list", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
@@ -439,6 +461,10 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 	objectType = canonicalObjectType(objectType)
 	if _, ok := listableTypes[objectType]; !ok {
 		return nil, fmt.Errorf("can't List() type %q", objectType)
+	}
+
+	if nft.nl != nil {
+		return nft.nl.List(ctx, objectType)
 	}
 
 	// We want to restrict nft to looking only at our table, so we have to do "list table"

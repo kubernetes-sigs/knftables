@@ -48,7 +48,7 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", testFamily, testTable),
 		},
 	)
-	nft, err := newInternal(family, tableName, fexec)
+	nft, err := newInternal(family, tableName, fexec, disableNetlink)
 	return nft, fexec, err
 }
 
@@ -736,7 +736,8 @@ func TestFeatures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fexec := newFakeExec(t)
 			fexec.expected = tc.commands
-			nft, err := newInternal(IPv4Family, "testing", fexec, tc.options...)
+			opts := append(tc.options, disableNetlink)
+			nft, err := newInternal(IPv4Family, "testing", fexec, opts...)
 			if err != nil {
 				if tc.result != nil {
 					t.Fatalf("Unexpected error creating Interface: %v", err)

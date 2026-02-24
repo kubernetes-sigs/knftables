@@ -1,4 +1,6 @@
-# Copyright 2023 The Kubernetes Authors.
+#!/usr/bin/env bash
+
+# Copyright The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,27 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all build:
-	echo "Usage:"
-	echo "make test   - run unit tests"
-	echo "make update - run gofmt, etc"
-	echo "make verify - run golangci, etc"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-clean:
+# This script runs the integration tests.
+# It requires `unshare` to create a new network namespace.
 
-test:
-	./hack/test.sh
+if ! command -v unshare >/dev/null 2>&1; then
+    echo "unshare is required but not found." >&2
+    exit 1
+fi
 
-test-integration:
-	./hack/test-integration.sh
+echo "Running integration tests in a new network namespace..."
 
-benchmark:
-	./hack/benchmark.sh
-
-update:
-	./hack/update.sh
-
-verify:
-	./hack/verify.sh
-
-.PHONY: all build clean test update verify
+# Run the tests in a new network namespace
+TEST_PATTERN="${1:-.}"
+unshare -rn go test -race -v -run "${TEST_PATTERN}" .
