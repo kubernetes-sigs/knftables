@@ -48,7 +48,7 @@ func newTestInterface(t *testing.T, family Family, tableName string) (Interface,
 			stdin: fmt.Sprintf("add table %s %s { comment \"test\" ; }\n", testFamily, testTable),
 		},
 	)
-	nft, err := newInternal(family, tableName, fexec)
+	nft, err := newInternal(family, tableName, fexec, disableNetlink)
 	return nft, fexec, err
 }
 
@@ -282,15 +282,21 @@ func TestListRules(t *testing.T) {
 			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.1", "release_name": "Fearless Fosdick #3", "json_schema_version": 1}}, {"chain": {"family": "ip", "table": "testing", "name": "testchain", "handle": 165}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 169, "expr": [{"match": {"op": "==", "left": {"ct": {"key": "state"}}, "right": {"set": ["established", "related"]}}}, {"accept": null}]}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 170, "comment": "This rule does something", "expr": [{"match": {"op": "in", "left": {"ct": {"key": "status"}}, "right": "dnat"}}, {"accept": null}]}}, {"rule": {"family": "ip", "table": "testing", "chain": "testchain", "handle": 171, "expr": [{"match": {"op": "==", "left": {"meta": {"key": "iifname"}}, "right": "lo"}}, {"accept": null}]}}]}`,
 			listOutput: []*Rule{
 				{
+					Family: IPv4Family,
+					Table:  "testing",
 					Chain:  "testchain",
 					Handle: PtrTo(169),
 				},
 				{
+					Family:  IPv4Family,
+					Table:   "testing",
 					Chain:   "testchain",
 					Comment: PtrTo("This rule does something"),
 					Handle:  PtrTo(170),
 				},
 				{
+					Family: IPv4Family,
+					Table:  "testing",
 					Chain:  "testchain",
 					Handle: PtrTo(171),
 				},
@@ -301,10 +307,14 @@ func TestListRules(t *testing.T) {
 			nftOutput: `{"nftables": [{"metainfo": {"version": "1.0.2", "release_name": "Lester Gooch", "json_schema_version": 1}}, {"table": {"family": "ip", "name": "testing", "handle": 3}}, {"chain": {"family": "ip", "table": "testing", "name": "chain1", "handle": 1}}, {"rule": {"family": "ip", "table": "testing", "chain": "chain1", "handle": 3, "expr": [{"match": {"op": "==", "left": {"payload": {"protocol": "ip", "field": "daddr"}}, "right": "8.8.8.8"}}, {"counter": {"packets": 0, "bytes": 0}}]}}, {"chain": {"family": "ip", "table": "testing", "name": "chain2", "handle": 2}}, {"rule": {"family": "ip", "table": "testing", "chain": "chain2", "handle": 4, "expr": [{"match": {"op": "==", "left": {"payload": {"protocol": "ip", "field": "daddr"}}, "right": "1.2.3.4"}}, {"counter": {"packets": 0, "bytes": 0}}]}}]}`,
 			listOutput: []*Rule{
 				{
+					Family: IPv4Family,
+					Table:  "testing",
 					Chain:  "chain1",
 					Handle: PtrTo(3),
 				},
 				{
+					Family: IPv4Family,
+					Table:  "testing",
 					Chain:  "chain2",
 					Handle: PtrTo(4),
 				},
@@ -726,7 +736,8 @@ func TestFeatures(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fexec := newFakeExec(t)
 			fexec.expected = tc.commands
-			nft, err := newInternal(IPv4Family, "testing", fexec, tc.options...)
+			opts := append(tc.options, disableNetlink)
+			nft, err := newInternal(IPv4Family, "testing", fexec, opts...)
 			if err != nil {
 				if tc.result != nil {
 					t.Fatalf("Unexpected error creating Interface: %v", err)
