@@ -383,7 +383,7 @@ func getJSONObjects(listOutput, objectType string) ([]map[string]interface{}, er
 
 // ListAll is part of Interface.
 func (nft *realNFTables) ListAll(ctx context.Context) (map[string][]string, error) {
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "--terse", "list", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -427,7 +427,7 @@ func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string,
 
 	// We want to restrict nft to looking only at our table, so we have to do "list table"
 	// rather than any variant of "list <objectType>".
-	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "--terse", "list", "table", string(nft.family), nft.table)
 	out, err := nft.exec.Run(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run nft: %w", err)
@@ -455,7 +455,7 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 
 	var cmd *exec.Cmd
 	if chain == "" {
-		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "table", string(nft.family), nft.table)
+		cmd = exec.CommandContext(ctx, nft.path, "--json", "--terse", "list", "table", string(nft.family), nft.table)
 	} else {
 		cmd = exec.CommandContext(ctx, nft.path, "--json", "list", "chain", string(nft.family), nft.table, chain)
 	}
