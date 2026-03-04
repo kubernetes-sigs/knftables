@@ -46,8 +46,8 @@ type Interface interface {
 	ListAll(ctx context.Context) (map[string][]string, error)
 
 	// List returns a list of the names of the objects of objectType ("chain", "set",
-	// "map" or "counter") in the table. If there are no such objects, this will
-	// return an empty list and no error.
+	// "map", "counter", or "flowtable" in the table. If there are no such objects,
+	// this will return an empty list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
 	// ListRules returns a list of the rules in a chain, in order. If no chain name is
@@ -423,12 +423,23 @@ func canonicalObjectType(objectType string) string {
 	return objectType
 }
 
+var listableTypes = map[string]bool{
+	"chain":     true,
+	"set":       true,
+	"map":       true,
+	"counter":   true,
+	"flowtable": true,
+}
+
 // List is part of Interface.
 func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
 	if nft.table == "" {
 		return nil, fmt.Errorf("can't use List() on a knftables.Interface with no associated family/table")
 	}
 	objectType = canonicalObjectType(objectType)
+	if _, ok := listableTypes[objectType]; !ok {
+		return nil, fmt.Errorf("can't List() type %q", objectType)
+	}
 
 	// We want to restrict nft to looking only at our table, so we have to do "list table"
 	// rather than any variant of "list <objectType>".
@@ -505,6 +516,9 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 func (nft *realNFTables) ListElements(ctx context.Context, objectType, name string) ([]*Element, error) {
 	if nft.table == "" {
 		return nil, fmt.Errorf("can't use ListElements() on a knftables.Interface with no associated family/table")
+	}
+	if objectType != "set" && objectType != "map" {
+		return nil, fmt.Errorf("invalid objectType %q", objectType)
 	}
 
 	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", objectType, string(nft.family), nft.table, name)

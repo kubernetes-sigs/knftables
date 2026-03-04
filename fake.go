@@ -158,6 +158,9 @@ func (fake *Fake) ListAll(_ context.Context) (map[string][]string, error) {
 // List is part of Interface.
 func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 	objectType = canonicalObjectType(objectType)
+	if _, ok := listableTypes[objectType]; !ok {
+		return nil, fmt.Errorf("can't List() type %q", objectType)
+	}
 
 	fake.RLock()
 	defer fake.RUnlock()
@@ -190,7 +193,7 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 		}
 
 	default:
-		return nil, fmt.Errorf("unsupported object type %q", objectType)
+		return nil, fmt.Errorf("internal error: missing List() support for %q", objectType)
 	}
 
 	return result, nil
@@ -222,6 +225,10 @@ func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
 
 // ListElements is part of Interface
 func (fake *Fake) ListElements(_ context.Context, objectType, name string) ([]*Element, error) {
+	if objectType != "set" && objectType != "map" {
+		return nil, fmt.Errorf("invalid objectType %q", objectType)
+	}
+
 	fake.RLock()
 	defer fake.RUnlock()
 	if fake.Table == nil {
