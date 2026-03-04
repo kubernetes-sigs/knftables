@@ -412,18 +412,23 @@ func (nft *realNFTables) ListAll(ctx context.Context) (map[string][]string, erro
 	return result, nil
 }
 
+// Takes objectType, which can be either singular or plural, and returns the singular
+// form.
+func canonicalObjectType(objectType string) string {
+	// All currently-existing nftables object types have plural forms that are just
+	// the singular form plus 's', and none have singular forms ending in 's'.
+	if objectType[len(objectType)-1] == 's' {
+		objectType = objectType[:len(objectType)-1]
+	}
+	return objectType
+}
+
 // List is part of Interface.
 func (nft *realNFTables) List(ctx context.Context, objectType string) ([]string, error) {
 	if nft.table == "" {
 		return nil, fmt.Errorf("can't use List() on a knftables.Interface with no associated family/table")
 	}
-
-	// objectType is allowed to be either singular or plural. All currently-existing
-	// nftables object types have plural forms that are just the singular form plus 's',
-	// and none have singular forms ending in 's'.
-	if objectType[len(objectType)-1] == 's' {
-		objectType = objectType[:len(objectType)-1]
-	}
+	objectType = canonicalObjectType(objectType)
 
 	// We want to restrict nft to looking only at our table, so we have to do "list table"
 	// rather than any variant of "list <objectType>".

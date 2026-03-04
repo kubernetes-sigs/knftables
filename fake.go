@@ -157,6 +157,8 @@ func (fake *Fake) ListAll(_ context.Context) (map[string][]string, error) {
 
 // List is part of Interface.
 func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
+	objectType = canonicalObjectType(objectType)
+
 	fake.RLock()
 	defer fake.RUnlock()
 	if fake.Table == nil {
@@ -166,23 +168,23 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 	var result []string
 
 	switch objectType {
-	case "flowtable", "flowtables":
+	case "flowtable":
 		for name := range fake.Table.Flowtables {
 			result = append(result, name)
 		}
-	case "chain", "chains":
+	case "chain":
 		for name := range fake.Table.Chains {
 			result = append(result, name)
 		}
-	case "set", "sets":
+	case "set":
 		for name := range fake.Table.Sets {
 			result = append(result, name)
 		}
-	case "map", "maps":
+	case "map":
 		for name := range fake.Table.Maps {
 			result = append(result, name)
 		}
-	case "counter", "counters":
+	case "counter":
 		for name := range fake.Table.Counters {
 			result = append(result, name)
 		}
