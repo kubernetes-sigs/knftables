@@ -116,7 +116,7 @@ func TestListBad(t *testing.T) {
 
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"/nft", "--json", "list", "table", "ip6", "testing"},
+					args:   []string{"/nft", "--json", "--terse", "list", "table", "ip6", "testing"},
 					stdout: tc.nftOutput,
 					err:    nftErr,
 				},
@@ -163,7 +163,7 @@ func TestList(t *testing.T) {
 
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"/nft", "--json", "list", "table", "ip", "testing"},
+					args:   []string{"/nft", "--json", "--terse", "list", "table", "ip", "testing"},
 					stdout: tc.nftOutput,
 				},
 			)
@@ -204,7 +204,7 @@ func TestListAll(t *testing.T) {
 
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
-					args:   []string{"/nft", "--json", "list", "table", "ip", "testing"},
+					args:   []string{"/nft", "--json", "--terse", "list", "table", "ip", "testing"},
 					stdout: tc.nftOutput,
 				},
 			)
@@ -321,7 +321,7 @@ func TestListRules(t *testing.T) {
 			if tc.chain == "" {
 				fexec.expected = append(fexec.expected,
 					expectedCmd{
-						args:   []string{"/nft", "--json", "list", "table", "ip", "testing"},
+						args:   []string{"/nft", "--json", "--terse", "list", "table", "ip", "testing"},
 						stdout: strings.TrimSpace(dedent.Dedent(tc.nftOutput)),
 						err:    err,
 					},
