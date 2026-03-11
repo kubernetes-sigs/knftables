@@ -14,7 +14,9 @@
   (`@danwinship`).
 
 - `ListElements()` now correctly handles maps/sets with concatenated
-  keys/values including CIDR values. (`@danwinship`)
+  keys/values including CIDR values.
+  ([#32](https://github.com/kubernetes-sigs/knftables/issues/32)
+  (`@danwinship`)
 
 ## v0.0.19
 
@@ -33,7 +35,9 @@
   for more details. (`@danwinship`)
 
 - Added `Counter` objects and the `tx.Reset()` verb, to support
-  nftables counters. (`@aroradaman`)
+  nftables counters.
+  ([#20](https://github.com/kubernetes-sigs/knftables/issues/20))
+  (`@aroradaman`)
 
 - Added `Table.Flags` and `Chain.Policy`. (Note that at this time the
   "owner" and "persist" table flags can't usefully be used with
@@ -42,7 +46,9 @@
   after it was created.) (`@danwinship`)
 
 - Fixed `Fake.ParseDump()` to correctly parse rules with raw payload
-  expressions (`@danwinship`) and `flow add` rules (`hongliangl`).
+  expressions
+  ([#22](https://github.com/kubernetes-sigs/knftables/issues/22))
+  (`@danwinship`) and `flow add` rules (`hongliangl`).
 
 ## v0.0.18
 
