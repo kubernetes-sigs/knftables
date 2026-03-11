@@ -1,5 +1,14 @@
 # ChangeLog
 
+## v0.0.21
+
+- Updated previous `List()` fix to pass the `--terse` flag to `nft
+  list`, to avoid wasting memory and CPU parsing JSON that isn't
+  relevant to `List()`'s output anyway. (`@danwinship`)
+
+- Added a note about `nft` versions to [README.md](./README.md).
+  (`@danwinship`)
+
 ## v0.0.20
 
 - `List()` has been changed to use `nft list table` rather than, e.g.,
