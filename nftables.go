@@ -492,7 +492,9 @@ func (nft *realNFTables) ListRules(ctx context.Context, chain string) ([]*Rule, 
 			return nil, fmt.Errorf("unexpected JSON output from nft (rule with no chain)")
 		}
 		rule := &Rule{
-			Chain: parentChain,
+			Family: nft.family,
+			Table:  nft.table,
+			Chain:  parentChain,
 		}
 
 		// handle is written as an integer in nft's output, but json.Unmarshal
