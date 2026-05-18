@@ -1,28 +1,38 @@
-run:
-  timeout: 2m
-
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
-    # default golangci-lint lints
     - errcheck
-    - gosimple
+    - errorlint
+    - gochecknoinits
     - govet
     - ineffassign
-    - staticcheck
-    - typecheck
-    - unused
-
-    # additional lints
-    - errorlint
-    - exportloopref
-    - gochecknoinits
-    - gofmt
     - misspell
     - revive
+    - staticcheck
     - unparam
+    - unused
     - whitespace
-
-linters-settings:
-  errorlint:
-    errorf: true
+  settings:
+    errorlint:
+      errorf: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

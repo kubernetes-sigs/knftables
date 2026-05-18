@@ -109,7 +109,7 @@ func TestListBad(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var nftErr error
 			if tc.nftError != "" {
-				nftErr = fmt.Errorf(tc.nftError)
+				nftErr = fmt.Errorf("%s", tc.nftError)
 			}
 
 			nft, fexec, _ := newTestInterface(t, IPv6Family, "testing")
@@ -326,7 +326,7 @@ func TestListRules(t *testing.T) {
 
 			var err error
 			if tc.nftError != "" {
-				err = fmt.Errorf(tc.nftError)
+				err = fmt.Errorf("%s", tc.nftError)
 			}
 			if tc.chain == "" {
 				fexec.expected = append(fexec.expected,
@@ -510,7 +510,7 @@ func TestListElements(t *testing.T) {
 
 			var err error
 			if tc.nftError != "" {
-				err = fmt.Errorf(tc.nftError)
+				err = fmt.Errorf("%s", tc.nftError)
 			}
 			fexec.expected = append(fexec.expected,
 				expectedCmd{
@@ -789,7 +789,7 @@ func TestListCounters(t *testing.T) {
 
 			var err error
 			if tc.nftError != "" {
-				err = fmt.Errorf(tc.nftError)
+				err = fmt.Errorf("%s", tc.nftError)
 			}
 			fexec.expected = append(fexec.expected,
 				expectedCmd{

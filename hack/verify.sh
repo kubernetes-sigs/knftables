@@ -19,7 +19,7 @@ set -o errexit -o nounset -o pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." &> /dev/null && pwd -P)"
 
 cd "${REPO_ROOT}/hack/tools"
-go build -o "${REPO_ROOT}"/hack/bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
+go build -o "${REPO_ROOT}"/hack/bin/golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 cd "${REPO_ROOT}"
 
 "${REPO_ROOT}"/hack/bin/golangci-lint --config "${REPO_ROOT}/hack/tools/.golangci.yml" run ./...

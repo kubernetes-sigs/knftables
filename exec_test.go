@@ -170,7 +170,7 @@ func TestFakeExec(t *testing.T) {
 				stdout: tc.expectedOut,
 			}}
 			if tc.expectedErr != "" {
-				execer.expected[0].err = fmt.Errorf(tc.expectedErr)
+				execer.expected[0].err = fmt.Errorf("%s", tc.expectedErr)
 			}
 
 			cmd := exec.Command(tc.command[0], tc.command[1:]...)
