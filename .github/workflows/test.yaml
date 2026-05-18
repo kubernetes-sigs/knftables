@@ -1,16 +1,14 @@
 on: [pull_request]
 name: Test
+env:
+  GO_VERSION: 1.25.x
 jobs:
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: [1.24.x, 1.25.x]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: ${{ env.GO_VERSION }}
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
     - run: make test
     - run: |
@@ -23,7 +21,7 @@ jobs:
     steps:
     - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
       with:
-        go-version: 1.21.x
+        go-version: ${{ env.GO_VERSION }}
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
     - run: make verify
   apidiff:
@@ -33,7 +31,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
       with:
-        go-version: 1.25.x
+        go-version: ${{ env.GO_VERSION }}
     - name: Add GOBIN to PATH
       run: echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
     - name: Install dependencies
