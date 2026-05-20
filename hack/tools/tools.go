@@ -8,5 +8,5 @@ https://github.com/golang/go/wiki/Modules#how-can-i-track-tool-dependencies-for-
 package tools
 
 import (
-	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
 )

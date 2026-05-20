@@ -1,8 +1,17 @@
 module sigs.k8s.io/knftables
 
-go 1.20
+go 1.25.0
 
 require (
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.7.0
+	github.com/google/nftables v0.3.0
 	github.com/lithammer/dedent v1.1.0
+	github.com/mdlayher/netlink v1.11.2
+)
+
+require (
+	github.com/mdlayher/socket v0.6.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 )
