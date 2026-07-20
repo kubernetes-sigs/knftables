@@ -13,10 +13,10 @@
 # limitations under the License.
 
 all build:
-	echo "Usage:"
-	echo "make test   - run unit tests"
-	echo "make update - run gofmt, etc"
-	echo "make verify - run golangci, etc"
+	@echo "Usage:"
+	@echo "make test   - run unit tests"
+	@echo "make update - run gofmt, etc"
+	@echo "make verify - run golangci, etc"
 
 clean:
 
