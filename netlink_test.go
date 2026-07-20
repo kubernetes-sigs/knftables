@@ -9,10 +9,6 @@ import (
 	nl "github.com/mdlayher/netlink"
 )
 
-// DisableNetlink is an exported alias for the internal disableNetlink option,
-// specifically for use for the integration tests on knftables_test.
-var DisableNetlink = disableNetlink
-
 func TestNetlinkAdapterListErrors(t *testing.T) {
 	// Create a gnftables.Conn with a mock dialer that always returns an error.
 	c, err := gnftables.New(gnftables.WithTestDial(func(_ []nl.Message) ([]nl.Message, error) {
