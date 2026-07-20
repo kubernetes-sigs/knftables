@@ -62,8 +62,8 @@ func runBenchmarkListChains(b *testing.B, useNetlink bool, numChains int) {
 	family := knftables.IPv4Family
 
 	var opts []knftables.Option
-	if !useNetlink {
-		opts = append(opts, knftables.DisableNetlink)
+	if useNetlink {
+		opts = append(opts, knftables.UseNetlink)
 	}
 
 	nft, err := knftables.New(family, tableName, opts...)

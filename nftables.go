@@ -88,9 +88,8 @@ const (
 	// emulation; see the docs for that method for more details.
 	EmulateDestroy Option = "EmulateDestroy"
 
-	// disableNetlink is an internal option used for testing to force the use of the
-	// nft command-line binary rather than the netlink library.
-	disableNetlink Option = "DisableNetlink"
+	// UseNetlink turns on the experimental netlink support for List* commands.
+	UseNetlink Option = "UseNetlink"
 )
 
 type nftContext struct {
@@ -214,11 +213,11 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 		nft.emulateDestroy = emulateDestroy
 	}
 
-	// Use netlink directly to avoid the performance overhead
-	// of executing nft list commands for every operation and
-	// avoid parsing nft output.
-	// TODO: Only some commands are implemented.
-	if !optionSet(options, disableNetlink) {
+	if optionSet(options, UseNetlink) {
+		// Use netlink directly to avoid the performance overhead
+		// of executing nft list commands for every operation and
+		// avoid parsing nft output.
+		// TODO: Only some commands are implemented.
 		nl, err := newNetlinkAdapter(family, table)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create netlink adapter: %w", err)
@@ -250,6 +249,9 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 //   - EmulateDestroy: adjust the API of `tx.Destroy()` to make it possible to emulate via
 //     `nft add` and `nft delete` on systems that do not have `nft destroy`; see the docs
 //     for `tx.Destroy()` for more details.
+//
+//   - UseNetlink: use the experimental netlink version of the List* methods rather than
+//     using `nft list`.
 func New(family Family, table string, options ...Option) (Interface, error) {
 	return newInternal(family, table, realExec{}, options...)
 }

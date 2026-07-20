@@ -42,7 +42,7 @@ func TestNetlinkListing(t *testing.T) {
 
 	// 1. Create a knftables user WITHOUT netlink to set up the rules.
 	// We rely on the `nft` binary for this part, which is what `knftables` used to default to.
-	nft, err := knftables.New(family, tableName, knftables.DisableNetlink)
+	nft, err := knftables.New(family, tableName)
 	if err != nil {
 		t.Fatalf("failed to create knftables: %v", err)
 	}
@@ -90,8 +90,8 @@ func TestNetlinkListing(t *testing.T) {
 		t.Fatalf("failed to setup nftables rules: %v", err)
 	}
 
-	// 3. Create a knftables client WITH netlink enabled (default).
-	nftNL, err := knftables.New(family, tableName)
+	// 3. Create a knftables client WITH netlink enabled
+	nftNL, err := knftables.New(family, tableName, knftables.UseNetlink)
 	if err != nil {
 		t.Fatalf("failed to create knftables with netlink: %v", err)
 	}
@@ -181,13 +181,13 @@ func TestNetlinkParity(t *testing.T) {
 
 	// 1. Client for setup (Binary)
 	// We use binary client for setup to ensure we are testing "Netlink Listing" against "Real Underlying State" created by "Standard Means".
-	clientBinary, err := knftables.New(family, tableName, knftables.DisableNetlink)
+	clientBinary, err := knftables.New(family, tableName)
 	if err != nil {
 		t.Fatalf("failed to create clientBinary: %v", err)
 	}
 
 	// 2. Client for Netlink Listing
-	clientNetlink, err := knftables.New(family, tableName)
+	clientNetlink, err := knftables.New(family, tableName, knftables.UseNetlink)
 	if err != nil {
 		t.Fatalf("failed to create clientNetlink: %v", err)
 	}
