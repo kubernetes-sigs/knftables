@@ -19,6 +19,7 @@ package knftables
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -910,5 +911,125 @@ func TestMultiTable(t *testing.T) {
 	err = nft.Run(context.Background(), tx)
 	if err == nil {
 		t.Errorf("expected an error trying to add an object with wrong Family/Table")
+	}
+}
+
+func TestNewWithExecer(t *testing.T) {
+	fexec := newFakeExec(t)
+	fexec.expected = append(fexec.expected,
+		expectedCmd{
+			args:   []string{"/nft", "--version"},
+			stdout: "nftables v1.0.7 (Old Doc Yak)\n",
+		},
+		expectedCmd{
+			args:  []string{"/nft", "--check", "-f", "-"},
+			stdin: "add table ip testing { comment \"test\" ; }\n",
+		},
+	)
+
+	nft, err := NewWithExecer(IPv4Family, "testing", fexec)
+	if err != nil {
+		t.Fatalf("unexpected error from NewWithExecer: %v", err)
+	}
+
+	tx := nft.NewTransaction()
+	tx.Add(&Chain{
+		Name: "chain1",
+	})
+
+	expected := "add chain ip testing chain1\n"
+	fexec.expected = append(fexec.expected,
+		expectedCmd{
+			args:  []string{"/nft", "-f", "-"},
+			stdin: expected,
+		},
+	)
+
+	if err := nft.Run(context.Background(), tx); err != nil {
+		t.Errorf("unexpected error from Run: %v", err)
+	}
+}
+
+func TestNewWithExecerCommandWrapping(t *testing.T) {
+	// wrappingExecer wraps commands by prepending a prefix to the binary path,
+	// simulating the kind of wrapping needed for nsenter.
+	type wrappingExecer struct {
+		inner  *fakeExec
+		prefix string
+	}
+
+	fexec := newFakeExec(t)
+	wrapper := &wrappingExecer{inner: fexec, prefix: "/wrapped"}
+
+	fexec.expected = append(fexec.expected,
+		expectedCmd{
+			args:   []string{"/wrapped/nft", "--version"},
+			stdout: "nftables v1.0.7 (Old Doc Yak)\n",
+		},
+		expectedCmd{
+			args:  []string{"/wrapped/nft", "--check", "-f", "-"},
+			stdin: "add table ip testing { comment \"test\" ; }\n",
+		},
+	)
+
+	// wrappingExecer.LookPath returns the inner result but prefixed
+	lookPath := func(file string) (string, error) {
+		path, err := fexec.LookPath(file)
+		if err != nil {
+			return "", err
+		}
+		return wrapper.prefix + path, nil
+	}
+
+	// wrappingExecer.Run delegates to inner
+	run := func(cmd *exec.Cmd) (string, error) {
+		return fexec.Run(cmd)
+	}
+
+	// Use a funcExecer to implement Execer via closures
+	fe := &funcExecer{lookPathFn: lookPath, runFn: run}
+	nft, err := NewWithExecer(IPv4Family, "testing", fe)
+	if err != nil {
+		t.Fatalf("unexpected error from NewWithExecer: %v", err)
+	}
+
+	tx := nft.NewTransaction()
+	tx.Add(&Chain{
+		Name: "mychain",
+	})
+
+	fexec.expected = append(fexec.expected,
+		expectedCmd{
+			args:  []string{"/wrapped/nft", "-f", "-"},
+			stdin: "add chain ip testing mychain\n",
+		},
+	)
+
+	if err := nft.Run(context.Background(), tx); err != nil {
+		t.Errorf("unexpected error from Run: %v", err)
+	}
+}
+
+// funcExecer is a test helper that implements Execer via function closures.
+type funcExecer struct {
+	lookPathFn func(string) (string, error)
+	runFn      func(*exec.Cmd) (string, error)
+}
+
+func (f *funcExecer) LookPath(file string) (string, error) {
+	return f.lookPathFn(file)
+}
+
+func (f *funcExecer) Run(cmd *exec.Cmd) (string, error) {
+	return f.runFn(cmd)
+}
+
+func TestDefaultExecer(t *testing.T) {
+	e := DefaultExecer()
+	if e == nil {
+		t.Fatal("DefaultExecer() returned nil")
+	}
+	if _, ok := e.(realExec); !ok {
+		t.Errorf("DefaultExecer() returned %T, expected realExec", e)
 	}
 }
