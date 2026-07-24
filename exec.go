@@ -20,8 +20,10 @@ import (
 	"os/exec"
 )
 
-// execer is a mockable wrapper around os/exec.
-type execer interface {
+// Execer is an interface wrapping os/exec that allows customizing how nft commands
+// are executed. This can be used to wrap command execution with nsenter for namespace
+// switching, add logging, or provide other command execution customizations.
+type Execer interface {
 	// LookPath wraps exec.LookPath
 	LookPath(file string) (string, error)
 
@@ -30,15 +32,22 @@ type execer interface {
 	Run(cmd *exec.Cmd) (string, error)
 }
 
-// realExec implements execer by actually using os/exec
+// DefaultExecer returns an Execer that uses os/exec directly to execute commands.
+// This is the same Execer used by New(). It can be used as a base for custom
+// Execer implementations that need to wrap the default behavior.
+func DefaultExecer() Execer {
+	return realExec{}
+}
+
+// realExec implements Execer by actually using os/exec
 type realExec struct{}
 
-// LookPath is part of execer
+// LookPath is part of Execer
 func (realExec) LookPath(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-// Run is part of execer
+// Run is part of Execer
 func (realExec) Run(cmd *exec.Cmd) (string, error) {
 	out, err := cmd.Output()
 	if err != nil {

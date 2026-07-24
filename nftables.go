@@ -116,7 +116,7 @@ type realNFTables struct {
 	bufferMutex sync.Mutex
 	buffer      *bytes.Buffer
 
-	exec execer
+	exec Execer
 	path string
 
 	nl netlink
@@ -133,7 +133,7 @@ func optionSet(options []Option, option Option) bool {
 
 // newInternal creates a new nftables.Interface for interacting with the given table; this
 // is split out from New() so it can be used from unit tests with a fakeExec.
-func newInternal(family Family, table string, execer execer, options ...Option) (Interface, error) {
+func newInternal(family Family, table string, execer Execer, options ...Option) (Interface, error) {
 	var err error
 
 	if (family == "") != (table == "") {
@@ -254,6 +254,15 @@ func newInternal(family Family, table string, execer execer, options ...Option) 
 //     using `nft list`.
 func New(family Family, table string, options ...Option) (Interface, error) {
 	return newInternal(family, table, realExec{}, options...)
+}
+
+// NewWithExecer creates a new nftables.Interface using the provided Execer for command
+// execution. This allows customizing how the nft binary is discovered and invoked -- for
+// example, to wrap commands with nsenter for executing in a different namespace context.
+//
+// See New() for details on the family, table, and options parameters.
+func NewWithExecer(family Family, table string, execer Execer, options ...Option) (Interface, error) {
+	return newInternal(family, table, execer, options...)
 }
 
 // NewTransaction is part of Interface
