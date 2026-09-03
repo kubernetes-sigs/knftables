@@ -730,15 +730,20 @@ func (flowtable *Flowtable) writeOperation(verb verb, ctx *nftContext, writer io
 			fmt.Fprintf(writer, " devices = { %s } ;", strings.Join(flowtable.Devices, ", "))
 		}
 
+		if flowtable.Counter != nil && *flowtable.Counter {
+			fmt.Fprintf(writer, " counter ;")
+		}
+
 		fmt.Fprintf(writer, " }")
 	}
 
 	fmt.Fprintf(writer, "\n")
 }
 
-// nft add flowtable inet example_table example_flowtable { hook ingress priority filter ; devices = { eth0 };  }
+// nft add flowtable inet example_table example_flowtable { hook ingress priority filter ; devices = { eth0 } ; counter ; }
+// Every property is optional, so a flowtable may have a counter and no devices.
 var flowtableRegexp = regexp.MustCompile(fmt.Sprintf(
-	`%s(?: {(?: hook ingress priority %s ;)(?: devices = {(.*)} ;) })?`,
+	`%s(?: {(?: hook ingress priority %s ;)?(?: devices = {(.*)} ;)?( counter ;)? })?`,
 	noSpaceGroup, noSpaceGroup))
 
 func (flowtable *Flowtable) parse(family Family, table, line string) error {
@@ -763,6 +768,9 @@ func (flowtable *Flowtable) parse(family Family, table, line string) error {
 		if len(devices) > 0 {
 			flowtable.Devices = devices
 		}
+	}
+	if match[4] != "" {
+		flowtable.Counter = PtrTo(true)
 	}
 	return nil
 }

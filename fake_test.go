@@ -667,6 +667,8 @@ func TestFakeParseDump(t *testing.T) {
 			dump: `
 				add table ip test
 				add flowtable ip test myflowtable { hook ingress priority filter ; devices = { eth0, eth1 } ; }
+				add flowtable ip test countedflowtable { hook ingress priority filter ; devices = { eth2 } ; counter ; }
+				add flowtable ip test nodevflowtable { hook ingress priority filter ; counter ; }
 				add chain ip test anotherchain
 				add chain ip test chain { comment "foo" ; }
 				add map ip test map1 { type ipv4_addr . inet_proto . inet_service ; }

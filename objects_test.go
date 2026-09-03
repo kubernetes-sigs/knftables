@@ -168,6 +168,27 @@ func TestObjects(t *testing.T) {
 			out: `create flowtable ip mytable myflowtable { hook ingress priority filter ; devices = { eth0, eth1 } ; }`,
 		},
 		{
+			name: "create flowtable with counter",
+			verb: createVerb,
+			object: &Flowtable{
+				Name:     "myflowtable",
+				Priority: PtrTo(FilterIngressPriority),
+				Devices:  []string{"eth0", "eth1"},
+				Counter:  PtrTo(true),
+			},
+			out: `create flowtable ip mytable myflowtable { hook ingress priority filter ; devices = { eth0, eth1 } ; counter ; }`,
+		},
+		{
+			name: "create flowtable with counter and no devices",
+			verb: createVerb,
+			object: &Flowtable{
+				Name:     "myflowtable",
+				Priority: PtrTo(FilterIngressPriority),
+				Counter:  PtrTo(true),
+			},
+			out: `create flowtable ip mytable myflowtable { hook ingress priority filter ; counter ; }`,
+		},
+		{
 			name: "flush flowtable",
 			verb: flushVerb,
 			object: &Flowtable{

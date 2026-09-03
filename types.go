@@ -496,6 +496,10 @@ type Flowtable struct {
 	// that should be offloaded.
 	Devices []string
 
+	// Counter enables packet and byte accounting for offloaded flows.
+	// (Optional; requires kernel 5.13 or later)
+	Counter *bool
+
 	// Handle is an identifier that can be used to uniquely identify an object when
 	// deleting it. When adding a new object, this must be nil
 	Handle *int
