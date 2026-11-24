@@ -234,7 +234,8 @@ func TestObjects(t *testing.T) {
 			verb: insertVerb,
 			object: &Flowtable{
 				Name: "myflowtable",
-			}, err: "not implemented",
+			},
+			err: "not implemented",
 		},
 		{
 			name: "invalid replace flowtable",
@@ -891,40 +892,10 @@ func TestObjects(t *testing.T) {
 			out:    "add counter ip mytable test-counter { packets 100 bytes 500 ; comment \"counter for unit tests\" ; }",
 		},
 		{
-			name:   "invalid add counter without name",
-			verb:   addVerb,
-			object: &Counter{},
-			err:    "no counter name specified",
-		},
-		{
-			name:   "invalid add counter with handle",
-			verb:   addVerb,
-			object: &Counter{Name: "dummy-counter", Handle: PtrTo(100)},
-			err:    "cannot specify Handle in add operation",
-		},
-		{
 			name:   "create counter with comment",
 			verb:   createVerb,
 			object: &Counter{Name: "test-counter", Comment: PtrTo("counter for unit tests")},
 			out:    "create counter ip mytable test-counter { comment \"counter for unit tests\" ; }",
-		},
-		{
-			name:   "invalid create counter with packets without bytes",
-			verb:   createVerb,
-			object: &Counter{Name: "test-counter", Packets: PtrTo[uint64](100)},
-			err:    "cannot specify Packets without Bytes in create operation",
-		},
-		{
-			name:   "invalid create counter with bytes without packets",
-			verb:   createVerb,
-			object: &Counter{Name: "test-counter", Bytes: PtrTo[uint64](1500)},
-			err:    "cannot specify Bytes without Packets in create operation",
-		},
-		{
-			name:   "create counter without name",
-			verb:   createVerb,
-			object: &Counter{},
-			err:    "no counter name specified",
 		},
 		{
 			name:   "delete counter by name",
@@ -945,6 +916,42 @@ func TestObjects(t *testing.T) {
 			out:    "destroy counter ip mytable test-counter",
 		},
 		{
+			name:   "reset counter",
+			verb:   resetVerb,
+			object: &Counter{Name: "test-counter"},
+			out:    "reset counter ip mytable test-counter",
+		},
+		{
+			name:   "invalid add counter without name",
+			verb:   addVerb,
+			object: &Counter{},
+			err:    "no counter name specified",
+		},
+		{
+			name:   "invalid add counter with handle",
+			verb:   addVerb,
+			object: &Counter{Name: "dummy-counter", Handle: PtrTo(100)},
+			err:    "cannot specify Handle in add operation",
+		},
+		{
+			name:   "invalid create counter without name",
+			verb:   createVerb,
+			object: &Counter{},
+			err:    "no counter name specified",
+		},
+		{
+			name:   "invalid create counter with packets without bytes",
+			verb:   createVerb,
+			object: &Counter{Name: "test-counter", Packets: PtrTo[uint64](100)},
+			err:    "cannot specify Packets without Bytes in create operation",
+		},
+		{
+			name:   "invalid create counter with bytes without packets",
+			verb:   createVerb,
+			object: &Counter{Name: "test-counter", Bytes: PtrTo[uint64](1500)},
+			err:    "cannot specify Bytes without Packets in create operation",
+		},
+		{
 			name:   "invalid insert counter",
 			verb:   insertVerb,
 			object: &Counter{Name: "test-counter"},
@@ -961,12 +968,6 @@ func TestObjects(t *testing.T) {
 			verb:   flushVerb,
 			object: &Counter{Name: "test-counter"},
 			err:    "flush is not implemented for counters",
-		},
-		{
-			name:   "invalid reset counter",
-			verb:   resetVerb,
-			object: &Counter{Name: "test-counter"},
-			out:    "reset counter ip mytable test-counter",
 		},
 		{
 			name:   "invalid reset without name",
