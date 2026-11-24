@@ -324,9 +324,9 @@ func (rule *Rule) writeOperation(verb verb, ctx *nftContext, writer io.Writer) {
 	fmt.Fprintf(writer, "\n")
 }
 
-// groups in []: [1]%s(?: index [2]%s)?(?: handle [3]%s)? [4]([^"]*)(?: comment [5]%s)?$
+// groups in []: [1]%s(?: index [2]%s)?(?: handle [3]%s)? [4](.*?)(?: comment [5]%s)?$
 var ruleRegexp = regexp.MustCompile(fmt.Sprintf(
-	`%s(?: index %s)?(?: handle %s)? ([^"]*)(?: comment %s)?$`,
+	`%s(?: index %s)?(?: handle %s)? (.*?)(?: comment %s)?$`,
 	noSpaceGroup, numberGroup, numberGroup, commentGroup))
 
 func (rule *Rule) parse(family Family, table, line string) error {

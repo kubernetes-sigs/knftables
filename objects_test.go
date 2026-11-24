@@ -488,6 +488,14 @@ func TestObjects(t *testing.T) {
 			parseInto: &Rule{},
 		},
 		{
+			name:   "add rule with quotes",
+			verb:   addVerb,
+			object: &Rule{Chain: "mychain", Rule: "counter name \"mycounter\" drop", Comment: PtrTo("comment")},
+			out:    `add rule ip mytable mychain counter name "mycounter" drop comment "comment"`,
+
+			parseInto: &Rule{},
+		},
+		{
 			name:   "add rule relative to index",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Index: PtrTo(2)},
