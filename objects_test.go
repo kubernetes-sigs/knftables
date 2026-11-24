@@ -18,6 +18,7 @@ package knftables
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -38,6 +39,8 @@ func TestObjects(t *testing.T) {
 		object Object
 		err    string
 		out    string
+
+		parseInto Object
 	}{
 		// Tables
 		{
@@ -45,18 +48,24 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Table{},
 			out:    `add table ip mytable`,
+
+			parseInto: &Table{},
 		},
 		{
 			name:   "add table with comment",
 			verb:   addVerb,
 			object: &Table{Comment: PtrTo("foo")},
 			out:    `add table ip mytable { comment "foo" ; }`,
+
+			parseInto: &Table{},
 		},
 		{
 			name:   "add table with flags",
 			verb:   addVerb,
 			object: &Table{Flags: []TableFlag{DormantFlag}},
 			out:    `add table ip mytable { flags dormant ; }`,
+
+			parseInto: &Table{},
 		},
 		{
 			name: "add table with comment and flags",
@@ -66,12 +75,16 @@ func TestObjects(t *testing.T) {
 				Flags:   []TableFlag{DormantFlag},
 			},
 			out: `add table ip mytable { comment "foo" ; flags dormant ; }`,
+
+			parseInto: &Table{},
 		},
 		{
 			name:   "create table",
 			verb:   createVerb,
 			object: &Table{},
 			out:    `create table ip mytable`,
+
+			parseInto: &Table{},
 		},
 		{
 			name:   "flush table",
@@ -130,6 +143,8 @@ func TestObjects(t *testing.T) {
 				Name: "myflowtable",
 			},
 			out: `add flowtable ip mytable myflowtable { }`,
+
+			parseInto: &Flowtable{},
 		},
 		{
 			name: "create flowtable",
@@ -138,6 +153,8 @@ func TestObjects(t *testing.T) {
 				Name: "myflowtable",
 			},
 			out: `create flowtable ip mytable myflowtable { }`,
+
+			parseInto: &Flowtable{},
 		},
 		{
 			name: "create flowtable with priority math",
@@ -147,6 +164,8 @@ func TestObjects(t *testing.T) {
 				Priority: PtrTo(FilterIngressPriority + "+5"),
 			},
 			out: `create flowtable ip mytable myflowtable { hook ingress priority filter+5 ; }`,
+
+			parseInto: &Flowtable{},
 		},
 		{
 			name: "create flowtable with devices",
@@ -156,6 +175,8 @@ func TestObjects(t *testing.T) {
 				Devices: []string{"eth0", "eth1"},
 			},
 			out: `create flowtable ip mytable myflowtable { devices = { eth0, eth1 } ; }`,
+
+			parseInto: &Flowtable{},
 		},
 		{
 			name: "create flowtable with devices and default priority",
@@ -166,6 +187,8 @@ func TestObjects(t *testing.T) {
 				Devices:  []string{"eth0", "eth1"},
 			},
 			out: `create flowtable ip mytable myflowtable { hook ingress priority filter ; devices = { eth0, eth1 } ; }`,
+
+			parseInto: &Flowtable{},
 		},
 		{
 			name: "create flowtable with counter",
@@ -177,6 +200,8 @@ func TestObjects(t *testing.T) {
 				Counter:  PtrTo(true),
 			},
 			out: `create flowtable ip mytable myflowtable { hook ingress priority filter ; devices = { eth0, eth1 } ; counter ; }`,
+
+			parseInto: &Flowtable{},
 		},
 		{
 			name: "create flowtable with counter and no devices",
@@ -187,6 +212,8 @@ func TestObjects(t *testing.T) {
 				Counter:  PtrTo(true),
 			},
 			out: `create flowtable ip mytable myflowtable { hook ingress priority filter ; counter ; }`,
+
+			parseInto: &Flowtable{},
 		},
 		{
 			name: "flush flowtable",
@@ -261,54 +288,78 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Chain{Name: "mychain"},
 			out:    `add chain ip mytable mychain`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "add chain with comment",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Comment: PtrTo("foo")},
 			out:    `add chain ip mytable mychain { comment "foo" ; }`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "add base chain",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority)},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; }`,
+			// `out` won't re-parse back to `object` because "priority srcnat" becomes "priority 100"
 		},
 		{
 			name:   "add base chain with priority math",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority + "+5")},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority 105 ; }`,
+			// `out` won't re-parse back to `object` because "priority srcnat+5" becomes "priority 105"
+		},
+		{
+			name:   "add base chain with numeric priority",
+			verb:   addVerb,
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(BaseChainPriority("99"))},
+			out:    `add chain ip mytable mychain { type nat hook postrouting priority 99 ; }`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "add base chain with unrecognized priority",
 			verb:   addVerb,
 			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(BaseChainPriority("futurevalue"))},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority futurevalue ; }`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "add base chain with comment",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority), Comment: PtrTo("foo")},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(BaseChainPriority("100")), Comment: PtrTo("foo")},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; comment "foo" ; }`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "add base chain with policy",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(SNATPriority), Policy: PtrTo(DropPolicy)},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(PostroutingHook), Priority: PtrTo(BaseChainPriority("100")), Policy: PtrTo(DropPolicy)},
 			out:    `add chain ip mytable mychain { type nat hook postrouting priority 100 ; policy drop ; }`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "add base chain with device",
 			verb:   addVerb,
-			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(IngressHook), Device: PtrTo("eth0"), Priority: PtrTo(SNATPriority)},
+			object: &Chain{Name: "mychain", Type: PtrTo(NATType), Hook: PtrTo(IngressHook), Device: PtrTo("eth0"), Priority: PtrTo(BaseChainPriority("100"))},
 			out:    `add chain ip mytable mychain { type nat hook ingress device "eth0" priority 100 ; }`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "create chain",
 			verb:   createVerb,
 			object: &Chain{Name: "mychain"},
 			out:    `create chain ip mytable mychain`,
+
+			parseInto: &Chain{},
 		},
 		{
 			name:   "flush chain",
@@ -425,42 +476,56 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop"},
 			out:    `add rule ip mytable mychain drop`,
+
+			parseInto: &Rule{},
 		},
 		{
 			name:   "add rule with comment",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Comment: PtrTo("comment")},
 			out:    `add rule ip mytable mychain drop comment "comment"`,
+
+			parseInto: &Rule{},
 		},
 		{
 			name:   "add rule relative to index",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Index: PtrTo(2)},
 			out:    `add rule ip mytable mychain index 2 drop`,
+
+			parseInto: &Rule{},
 		},
 		{
 			name:   "add rule relative to handle",
 			verb:   addVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Handle: PtrTo(2)},
 			out:    `add rule ip mytable mychain handle 2 drop`,
+
+			parseInto: &Rule{},
 		},
 		{
 			name:   "insert rule",
 			verb:   insertVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop"},
 			out:    `insert rule ip mytable mychain drop`,
+
+			parseInto: &Rule{},
 		},
 		{
 			name:   "insert rule with comment relative to handle",
 			verb:   insertVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Comment: PtrTo("comment"), Handle: PtrTo(2)},
 			out:    `insert rule ip mytable mychain handle 2 drop comment "comment"`,
+
+			parseInto: &Rule{},
 		},
 		{
 			name:   "replace rule",
 			verb:   replaceVerb,
 			object: &Rule{Chain: "mychain", Rule: "drop", Handle: PtrTo(2)},
 			out:    `replace rule ip mytable mychain handle 2 drop`,
+
+			parseInto: &Rule{},
 		},
 		{
 			name:   "delete rule",
@@ -535,12 +600,16 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Set{Name: "myset", Type: "ipv4_addr"},
 			out:    `add set ip mytable myset { type ipv4_addr ; }`,
+
+			parseInto: &Set{},
 		},
 		{
 			name:   "add set with TypeOf",
 			verb:   addVerb,
 			object: &Set{Name: "myset", TypeOf: "ip saddr"},
 			out:    `add set ip mytable myset { typeof ip saddr ; }`,
+
+			parseInto: &Set{},
 		},
 		{
 			name: "add set with all properties",
@@ -557,12 +626,16 @@ func TestObjects(t *testing.T) {
 				Comment:    PtrTo("that's a lot of options"),
 			},
 			out: `add set ip mytable myset { type ipv4_addr ; flags dynamic,interval ; timeout 180s ; gc-interval 3600s ; size 1000 ; policy performance ; auto-merge ; comment "that's a lot of options" ; }`,
+
+			parseInto: &Set{},
 		},
 		{
 			name:   "create set",
 			verb:   createVerb,
 			object: &Set{Name: "myset", Type: "ipv4_addr"},
 			out:    `create set ip mytable myset { type ipv4_addr ; }`,
+
+			parseInto: &Set{},
 		},
 		{
 			name:   "flush set",
@@ -649,12 +722,16 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
 			out:    `add map ip mytable mymap { type ipv4_addr : ipv4_addr ; }`,
+
+			parseInto: &Map{},
 		},
 		{
 			name:   "add map with TypeOf",
 			verb:   addVerb,
 			object: &Map{Name: "mymap", TypeOf: "ip saddr : ip saddr"},
 			out:    `add map ip mytable mymap { typeof ip saddr : ip saddr ; }`,
+
+			parseInto: &Map{},
 		},
 		{
 			name: "add map with all properties",
@@ -670,12 +747,16 @@ func TestObjects(t *testing.T) {
 				Comment:    PtrTo("that's a lot of options"),
 			},
 			out: `add map ip mytable mymap { type ipv4_addr : ipv4_addr ; flags dynamic,interval ; timeout 180s ; gc-interval 3600s ; size 1000 ; policy performance ; comment "that's a lot of options" ; }`,
+
+			parseInto: &Map{},
 		},
 		{
 			name:   "create map",
 			verb:   createVerb,
 			object: &Map{Name: "mymap", Type: "ipv4_addr : ipv4_addr"},
 			out:    `create map ip mytable mymap { type ipv4_addr : ipv4_addr ; }`,
+
+			parseInto: &Map{},
 		},
 		{
 			name:   "flush map",
@@ -762,24 +843,32 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}},
 			out:    `add element ip mytable myset { 10.0.0.1 }`,
+
+			parseInto: &Element{},
 		},
 		{
 			name:   "add (map) element",
 			verb:   addVerb,
 			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}},
 			out:    `add element ip mytable mymap { 10.0.0.1 : 192.168.1.1 }`,
+
+			parseInto: &Element{},
 		},
 		{
 			name:   "create (set) element with comment",
 			verb:   createVerb,
 			object: &Element{Set: "myset", Key: []string{"10.0.0.1"}, Comment: PtrTo("comment")},
 			out:    `create element ip mytable myset { 10.0.0.1 comment "comment" }`,
+
+			parseInto: &Element{},
 		},
 		{
 			name:   "create (map) element with comment",
 			verb:   addVerb,
 			object: &Element{Map: "mymap", Key: []string{"10.0.0.1"}, Value: []string{"192.168.1.1"}, Comment: PtrTo("comment")},
 			out:    `add element ip mytable mymap { 10.0.0.1 comment "comment" : 192.168.1.1 }`,
+
+			parseInto: &Element{},
 		},
 		{
 			name:   "delete (set) element",
@@ -878,24 +967,32 @@ func TestObjects(t *testing.T) {
 			verb:   addVerb,
 			object: &Counter{Name: "test-counter", Comment: PtrTo("counter for unit tests")},
 			out:    "add counter ip mytable test-counter { comment \"counter for unit tests\" ; }",
+
+			parseInto: &Counter{},
 		},
 		{
 			name:   "add counter without comment",
 			verb:   addVerb,
 			object: &Counter{Name: "test-counter"},
 			out:    "add counter ip mytable test-counter",
+
+			parseInto: &Counter{},
 		},
 		{
 			name:   "add counter with comment, packets and bytes.",
 			verb:   addVerb,
 			object: &Counter{Name: "test-counter", Comment: PtrTo("counter for unit tests"), Packets: PtrTo[uint64](100), Bytes: PtrTo[uint64](500)},
 			out:    "add counter ip mytable test-counter { packets 100 bytes 500 ; comment \"counter for unit tests\" ; }",
+
+			parseInto: &Counter{},
 		},
 		{
 			name:   "create counter with comment",
 			verb:   createVerb,
 			object: &Counter{Name: "test-counter", Comment: PtrTo("counter for unit tests")},
 			out:    "create counter ip mytable test-counter { comment \"counter for unit tests\" ; }",
+
+			parseInto: &Counter{},
 		},
 		{
 			name:   "delete counter by name",
@@ -1001,6 +1098,19 @@ func TestObjects(t *testing.T) {
 				out := strings.TrimSuffix(b.String(), "\n")
 				if out != tc.out {
 					t.Errorf("expected %q but got %q", tc.out, out)
+				}
+			}
+
+			if tc.parseInto != nil {
+				line := strings.Join(strings.Split(tc.out, " ")[4:], " ")
+				err := tc.parseInto.parse("", "", line)
+				if err != nil {
+					t.Errorf("unexpected error reparsing: %v", err)
+				} else if !reflect.DeepEqual(tc.object, tc.parseInto) {
+					b := &strings.Builder{}
+					tc.parseInto.writeOperation(tc.verb, ctx, b)
+					out := strings.TrimSuffix(b.String(), "\n")
+					t.Errorf("re-parsed object (%q) does not equal original (%q)", out, tc.out)
 				}
 			}
 		})
